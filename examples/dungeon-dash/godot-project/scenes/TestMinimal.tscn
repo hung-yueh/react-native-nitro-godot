@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://test_minimal"]
+
+[sub_resource type="StandardMaterial3D" id="red_mat"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="box_mesh"]
+size = Vector3(2, 2, 2)
+material = SubResource("red_mat")
+
+[node name="TestMinimal" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 0, 3, 6)
+current = true
+
+[node name="RedBox" type="MeshInstance3D" parent="."]
+mesh = SubResource("box_mesh")
+
+[node name="Light" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, 0.707, 0, -0.707, 0.707, 0, 5, 3)

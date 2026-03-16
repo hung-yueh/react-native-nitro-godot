@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "godot-best-practices": {
+      "source": "jwynia/agent-skills",
+      "sourceType": "github",
+      "computedHash": "1137c05247cfcc6547064f99c6eeddcdb0e18fab9d76b2c40d8d4cf12b6c6025"
+    },
+    "godot-gdscript-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "3dbda48b5d5a2724aea04903db84f2fb76d6979c9f9a3e73932c6ae10f4505e1"
+    }
+  }
+}

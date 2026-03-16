@@ -1,0 +1,4 @@
+# Godot 4.x specific ignores
+.godot/
+*.import
+export_presets.cfg

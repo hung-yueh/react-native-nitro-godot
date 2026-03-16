@@ -1,0 +1,29 @@
+{
+  "name": "nitro-godot-lab",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "android:device": "expo run:android --device",
+    "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild --clean"
+  },
+  "dependencies": {
+    "@legendapp/state": "^3.0.0-beta.45",
+    "expo": "~55.0.6",
+    "expo-asset": "~55.0.8",
+    "expo-dev-client": "~55.0.16",
+    "expo-file-system": "~55.0.10",
+    "expo-status-bar": "~55.0.4",
+    "react": "19.2.0",
+    "react-native": "0.83.2",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-nitro-godot": "file:../",
+    "react-native-nitro-modules": "^0.35.0",
+    "react-native-reanimated": "4.2.1"
+  },
+  "private": true
+}

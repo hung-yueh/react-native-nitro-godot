@@ -1,0 +1,12 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["godot"],
+  "ios": {
+    "iosModuleName": "NitroGodot"
+  },
+  "android": {
+    "androidNamespace": ["godot"],
+    "androidCxxLibName": "NitroGodot"
+  },
+  "autolinking": {}
+}

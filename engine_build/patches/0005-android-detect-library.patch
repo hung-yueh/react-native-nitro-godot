@@ -1,0 +1,13 @@
+diff --git a/platform/android/detect.py b/platform/android/detect.py
+index a272a63..aab9174 100644
+--- a/platform/android/detect.py
++++ b/platform/android/detect.py
+@@ -80,7 +80,7 @@ def get_flags():
+     return {
+         "arch": "arm64",
+         "target": "template_debug",
+-        "supported": ["mono"],
++        "supported": ["library", "mono"],
+     }
+ 
+ 

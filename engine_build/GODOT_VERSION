@@ -1,0 +1,5 @@
+# Godot Engine version pinning
+# Format: VERSION COMMIT_HASH
+# The build script downloads source from the commit hash.
+# To upgrade: change both values and run `bash engine_build/build_godot.sh`
+4.7-dev2 778cf54dabd8a9e25b698a87036ab8604183f303

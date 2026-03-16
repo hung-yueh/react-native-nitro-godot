@@ -1,0 +1,149 @@
+[gd_scene load_steps=13 format=3 uid="uid://floor2_scene"]
+
+[ext_resource type="Script" path="res://scripts/Enemy.gd" id="enemy_script"]
+[ext_resource type="Script" path="res://scripts/Collectible.gd" id="collectible_script"]
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_color = Color(0.2, 0.15, 0.25, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="wall_mat"]
+albedo_color = Color(0.4, 0.25, 0.35, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="enemy_mat"]
+albedo_color = Color(1.0, 0.4, 0.1, 1)
+roughness = 0.7
+
+[sub_resource type="BoxShape3D" id="enemy_shape"]
+size = Vector3(0.8, 1.2, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="crossbow_mat"]
+albedo_color = Color(0.6, 0.4, 0.2, 1)
+roughness = 0.5
+metallic = 0.4
+
+[sub_resource type="SphereShape3D" id="collectible_shape"]
+radius = 0.8
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+size = Vector3(24, 0.5, 24)
+material = SubResource("floor_mat")
+
+[sub_resource type="BoxMesh" id="wall_ns_mesh"]
+size = Vector3(24, 3, 0.5)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_ew_mesh"]
+size = Vector3(0.5, 3, 24)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_center_mesh"]
+size = Vector3(6, 3, 0.5)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_centerv_mesh"]
+size = Vector3(0.5, 3, 6)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="enemy_mesh"]
+size = Vector3(0.8, 1.2, 0.8)
+material = SubResource("enemy_mat")
+
+[sub_resource type="BoxMesh" id="enemy3_mesh"]
+size = Vector3(1.0, 1.5, 1.0)
+material = SubResource("enemy_mat")
+
+[sub_resource type="BoxMesh" id="crossbow_mesh"]
+size = Vector3(0.6, 0.15, 0.15)
+material = SubResource("crossbow_mat")
+
+[node name="DungeonFloor2" type="Node3D"]
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+mesh = SubResource("floor_mesh")
+
+[node name="WallNorth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -12)
+mesh = SubResource("wall_ns_mesh")
+
+[node name="WallSouth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 12)
+mesh = SubResource("wall_ns_mesh")
+
+[node name="WallWest" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.5, 0)
+mesh = SubResource("wall_ew_mesh")
+
+[node name="WallEast" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.5, 0)
+mesh = SubResource("wall_ew_mesh")
+
+[node name="WallCenter" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+mesh = SubResource("wall_center_mesh")
+
+[node name="WallCenterV" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.5, -4)
+mesh = SubResource("wall_centerv_mesh")
+
+[node name="Enemy1" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.6, -6)
+script = ExtResource("enemy_script")
+max_health = 75
+patrol_distance = 5.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy1"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy1"]
+shape = SubResource("enemy_shape")
+
+[node name="Enemy2" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.6, 6)
+script = ExtResource("enemy_script")
+max_health = 75
+patrol_distance = 4.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy2"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy2"]
+shape = SubResource("enemy_shape")
+
+[node name="Enemy3" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.6, 8)
+script = ExtResource("enemy_script")
+max_health = 100
+patrol_distance = 3.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy3"]
+mesh = SubResource("enemy3_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy3"]
+shape = SubResource("enemy_shape")
+
+[node name="Enemy4" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.6, -8)
+script = ExtResource("enemy_script")
+max_health = 60
+patrol_distance = 6.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy4"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy4"]
+shape = SubResource("enemy_shape")
+
+[node name="Crossbow" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.8, 8)
+script = ExtResource("collectible_script")
+item_type = "crossbow"
+ammo_amount = 15
+
+[node name="Mesh" type="MeshInstance3D" parent="Crossbow"]
+mesh = SubResource("crossbow_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Crossbow"]
+shape = SubResource("collectible_shape")

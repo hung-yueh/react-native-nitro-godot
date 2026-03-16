@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Dungeon Dash",
+    "slug": "dungeon-dash",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "net.libgodot.dungeondash",
+      "appleTeamId": "ERN2P55L6C"
+    },
+    "android": {
+      "package": "net.libgodot.dungeondash"
+    }
+  }
+}

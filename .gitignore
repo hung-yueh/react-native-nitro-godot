@@ -1,0 +1,114 @@
+# ========================
+# Dependencies
+# ========================
+node_modules/
+package-lock.json
+
+# ========================
+# Build outputs (JS/TS)
+# ========================
+lib/
+
+# ========================
+# Android build artifacts
+# ========================
+android/build/
+android/.cxx/
+android/.gradle/
+*.apk
+*.aab
+
+# ========================
+# iOS build artifacts
+# ========================
+*.xcworkspace
+*.xcuserdata/
+Pods/
+DerivedData/
+
+# ========================
+# Godot engine build
+# ========================
+engine_build/godot-src/
+engine_build/output/
+engine_build/tmp_apk/
+engine_build/*.tar.gz
+engine_build/*.zip
+engine_build/build_log.txt
+
+# ========================
+# Godot editor artifacts
+# ========================
+.godot/
+*.import
+
+# ========================
+# AI agent directories
+# ========================
+.gemini/
+
+# ========================
+# Expo / React Native
+# ========================
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# ========================
+# Lab (example app) generated dirs
+# ========================
+lab/ios/
+lab/android/
+
+# ========================
+# OS files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Secrets & env
+# ========================
+.env
+.env.*
+*.local
+*.pem
+*.p8
+*.p12
+*.key
+*.jks
+*.mobileprovision
+*.keystore
+
+# ========================
+# IDE
+# ========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========================
+# Debug & logs
+# ========================
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ========================
+# TypeScript
+# ========================
+*.tsbuildinfo
+
+# ========================
+# Compiled objects / binaries
+# (safety net — these should never be at root)
+# ========================
+*.o
+*.so
+*.dylib
+*.a
+*.dex

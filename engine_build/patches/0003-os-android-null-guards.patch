@@ -1,0 +1,235 @@
+diff --git a/platform/android/os_android.cpp b/platform/android/os_android.cpp
+index 2350002..194cc96 100644
+--- a/platform/android/os_android.cpp
++++ b/platform/android/os_android.cpp
+@@ -96,6 +96,8 @@ public:
+ 
+ void OS_Android::alert(const String &p_alert, const String &p_title) {
+ 	ERR_FAIL_NULL(godot_java);
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	godot_java->alert(p_alert, p_title);
+ }
+ 
+@@ -112,7 +114,11 @@ void OS_Android::initialize_core() {
+ 	}
+ #endif
+ 	FileAccess::make_default<FileAccessUnix>(FileAccess::ACCESS_USERDATA);
+-	FileAccess::make_default<FileAccessFilesystemJAndroid>(FileAccess::ACCESS_FILESYSTEM);
++	if (godot_java) {
++		FileAccess::make_default<FileAccessFilesystemJAndroid>(FileAccess::ACCESS_FILESYSTEM);
++	} else {
++		FileAccess::make_default<FileAccessUnix>(FileAccess::ACCESS_FILESYSTEM);
++	}
+ 
+ #ifdef TOOLS_ENABLED
+ 	DirAccess::make_default<DirAccessUnix>(DirAccess::ACCESS_RESOURCES);
+@@ -124,7 +130,11 @@ void OS_Android::initialize_core() {
+ 	}
+ #endif
+ 	DirAccess::make_default<DirAccessUnix>(DirAccess::ACCESS_USERDATA);
+-	DirAccess::make_default<DirAccessJAndroid>(DirAccess::ACCESS_FILESYSTEM);
++	if (godot_java) {
++		DirAccess::make_default<DirAccessJAndroid>(DirAccess::ACCESS_FILESYSTEM);
++	} else {
++		DirAccess::make_default<DirAccessUnix>(DirAccess::ACCESS_FILESYSTEM);
++	}
+ 
+ 	NetSocketAndroid::make_default();
+ }
+@@ -134,6 +144,8 @@ void OS_Android::initialize() {
+ }
+ 
+ void OS_Android::initialize_joypads() {
++	// LIBGODOT null guard: godot_java is null in libgodot embedding mode
++	if (!godot_java) return;
+ 	Input::get_singleton()->set_fallback_mapping(godot_java->get_input_fallback_mapping());
+ 
+ 	// This queries/updates the currently connected devices/joypads.
+@@ -167,14 +179,20 @@ GodotIOJavaWrapper *OS_Android::get_godot_io_java() {
+ }
+ 
+ bool OS_Android::request_permission(const String &p_name) {
++	// LIBGODOT null guard
++	if (!godot_java) return false;
+ 	return godot_java->request_permission(p_name);
+ }
+ 
+ bool OS_Android::request_permissions() {
++	// LIBGODOT null guard
++	if (!godot_java) return false;
+ 	return godot_java->request_permissions();
+ }
+ 
+ Vector<String> OS_Android::get_granted_permissions() const {
++	// LIBGODOT null guard
++	if (!godot_java) return Vector<String>();
+ 	return godot_java->get_granted_permissions();
+ }
+ 
+@@ -431,6 +449,8 @@ void OS_Android::main_loop_focusin() {
+ }
+ 
+ Error OS_Android::shell_open(const String &p_uri) {
++	// LIBGODOT null guard
++	if (!godot_io_java) return ERR_UNAVAILABLE;
+ 	return godot_io_java->open_uri(p_uri);
+ }
+ 
+@@ -447,6 +467,8 @@ String OS_Android::get_resource_dir() const {
+ }
+ 
+ String OS_Android::get_locale() const {
++	// LIBGODOT null guard
++	if (!godot_io_java) return "en";
+ 	String locale = godot_io_java->get_locale();
+ 	if (!locale.is_empty()) {
+ 		return locale;
+@@ -456,6 +478,8 @@ String OS_Android::get_locale() const {
+ }
+ 
+ String OS_Android::get_model_name() const {
++	// LIBGODOT null guard
++	if (!godot_io_java) return "Android";
+ 	String model = godot_io_java->get_model();
+ 	if (!model.is_empty()) {
+ 		return model;
+@@ -709,6 +733,8 @@ String OS_Android::get_user_data_dir(const String &p_user_dir) const {
+ 		return data_dir_cache;
+ 	}
+ 
++	// LIBGODOT null guard
++	if (!godot_io_java) return "/data/local/tmp/godot";
+ 	String data_dir = godot_io_java->get_user_data_dir(p_user_dir);
+ 	if (!data_dir.is_empty()) {
+ 		data_dir_cache = _remove_symlink(data_dir);
+@@ -726,6 +752,8 @@ String OS_Android::get_cache_path() const {
+ 		return cache_dir_cache;
+ 	}
+ 
++	// LIBGODOT null guard
++	if (!godot_io_java) return "/data/local/tmp/godot/cache";
+ 	String cache_dir = godot_io_java->get_cache_dir();
+ 	if (!cache_dir.is_empty()) {
+ 		cache_dir_cache = _remove_symlink(cache_dir);
+@@ -739,6 +767,8 @@ String OS_Android::get_temp_path() const {
+ 		return temp_dir_cache;
+ 	}
+ 
++	// LIBGODOT null guard
++	if (!godot_io_java) return "/data/local/tmp/godot/tmp";
+ 	String temp_dir = godot_io_java->get_temp_dir();
+ 	if (!temp_dir.is_empty()) {
+ 		temp_dir_cache = _remove_symlink(temp_dir);
+@@ -748,6 +778,8 @@ String OS_Android::get_temp_path() const {
+ }
+ 
+ String OS_Android::get_unique_id() const {
++	// LIBGODOT null guard
++	if (!godot_io_java) return "";
+ 	String unique_id = godot_io_java->get_unique_id();
+ 	if (!unique_id.is_empty()) {
+ 		return unique_id;
+@@ -757,6 +789,8 @@ String OS_Android::get_unique_id() const {
+ }
+ 
+ String OS_Android::get_system_dir(SystemDir p_dir, bool p_shared_storage) const {
++	// LIBGODOT null guard
++	if (!godot_io_java) return "";
+ 	return godot_io_java->get_system_dir(p_dir, p_shared_storage);
+ }
+ 
+@@ -817,6 +851,8 @@ ANativeWindow *OS_Android::get_native_window() const {
+ }
+ 
+ void OS_Android::vibrate_handheld(int p_duration_ms, float p_amplitude) {
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	godot_java->vibrate(p_duration_ms, p_amplitude);
+ }
+ 
+@@ -826,12 +862,16 @@ String OS_Android::get_config_path() const {
+ 
+ void OS_Android::benchmark_begin_measure(const String &p_context, const String &p_what) {
+ #ifdef TOOLS_ENABLED
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	godot_java->begin_benchmark_measure(p_context, p_what);
+ #endif
+ }
+ 
+ void OS_Android::benchmark_end_measure(const String &p_context, const String &p_what) {
+ #ifdef TOOLS_ENABLED
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	godot_java->end_benchmark_measure(p_context, p_what);
+ #endif
+ }
+@@ -841,16 +881,22 @@ void OS_Android::benchmark_dump() {
+ 	if (!is_use_benchmark_set()) {
+ 		return;
+ 	}
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	godot_java->dump_benchmark(get_benchmark_file());
+ #endif
+ }
+ 
+ #ifdef TOOLS_ENABLED
+ Error OS_Android::sign_apk(const String &p_input_path, const String &p_output_path, const String &p_keystore_path, const String &p_keystore_user, const String &p_keystore_password) {
++	// LIBGODOT null guard
++	if (!godot_java) return FAILED;
+ 	return godot_java->sign_apk(p_input_path, p_output_path, p_keystore_path, p_keystore_user, p_keystore_password);
+ }
+ 
+ Error OS_Android::verify_apk(const String &p_apk_path) {
++	// LIBGODOT null guard
++	if (!godot_java) return FAILED;
+ 	return godot_java->verify_apk(p_apk_path);
+ }
+ #endif
+@@ -880,6 +926,8 @@ bool OS_Android::_check_internal_feature_support(const String &p_feature) {
+ 	}
+ #endif
+ 
++	// LIBGODOT null guard
++	if (!godot_java) return false;
+ 	if (godot_java->check_internal_feature_support(p_feature)) {
+ 		return true;
+ 	}
+@@ -932,6 +980,8 @@ Error OS_Android::create_process(const String &p_path, const List<String> &p_arg
+ }
+ 
+ Error OS_Android::create_instance(const List<String> &p_arguments, ProcessID *r_child_id) {
++	// LIBGODOT null guard
++	if (!godot_java) return FAILED;
+ 	int instance_id = godot_java->create_new_godot_instance(p_arguments);
+ 	if (instance_id == -1) {
+ 		return FAILED;
+@@ -943,6 +993,8 @@ Error OS_Android::create_instance(const List<String> &p_arguments, ProcessID *r_
+ }
+ 
+ Error OS_Android::kill(const ProcessID &p_pid) {
++	// LIBGODOT null guard
++	if (!godot_java) return OS_Unix::kill(p_pid);
+ 	if (godot_java->force_quit(nullptr, p_pid)) {
+ 		return OK;
+ 	}
+@@ -950,6 +1002,8 @@ Error OS_Android::kill(const ProcessID &p_pid) {
+ }
+ 
+ String OS_Android::get_system_ca_certificates() {
++	// LIBGODOT null guard
++	if (!godot_java) return String();
+ 	return godot_java->get_ca_certificates();
+ }
+ 
+@@ -964,6 +1018,8 @@ Error OS_Android::setup_remote_filesystem(const String &p_server_host, int p_por
+ }
+ 
+ void OS_Android::load_platform_gdextensions() const {
++	// LIBGODOT null guard
++	if (!godot_java) return;
+ 	Vector<String> extension_list_config_file = godot_java->get_gdextension_list_config_file();
+ 	for (String config_file_path : extension_list_config_file) {
+ 		GDExtensionManager::LoadStatus err = GDExtensionManager::get_singleton()->load_extension(config_file_path);

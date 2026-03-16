@@ -1,0 +1,237 @@
+[gd_scene load_steps=27 format=3 uid="uid://main_scene"]
+
+[ext_resource type="Script" path="res://scripts/Player.gd" id="player_script"]
+[ext_resource type="Script" path="res://scripts/Enemy.gd" id="enemy_script"]
+[ext_resource type="Script" path="res://scripts/Collectible.gd" id="collectible_script"]
+[ext_resource type="Script" path="res://scripts/Portal.gd" id="portal_script"]
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_color = Color(0.25, 0.22, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="wall_mat"]
+albedo_color = Color(0.35, 0.3, 0.4, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="player_mat"]
+albedo_color = Color(0.2, 0.9, 0.4, 1)
+roughness = 0.6
+metallic = 0.3
+
+[sub_resource type="StandardMaterial3D" id="enemy_mat"]
+albedo_color = Color(0.9, 0.2, 0.2, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="sword_mat"]
+albedo_color = Color(0.95, 0.85, 0.3, 1)
+roughness = 0.4
+metallic = 0.7
+
+[sub_resource type="StandardMaterial3D" id="potion_mat"]
+albedo_color = Color(0.3, 0.6, 1.0, 1)
+roughness = 0.3
+metallic = 0.2
+
+[sub_resource type="StandardMaterial3D" id="portal_mat"]
+albedo_color = Color(0.7, 0.3, 1.0, 0.7)
+roughness = 0.2
+metallic = 0.5
+transparency = 1
+
+[sub_resource type="CylinderShape3D" id="player_shape"]
+radius = 0.4
+height = 1.6
+
+[sub_resource type="SphereShape3D" id="attack_shape"]
+radius = 2.0
+
+[sub_resource type="BoxShape3D" id="enemy_shape"]
+size = Vector3(0.8, 1.2, 0.8)
+
+[sub_resource type="SphereShape3D" id="collectible_shape"]
+radius = 0.8
+
+[sub_resource type="SphereShape3D" id="portal_shape"]
+radius = 1.5
+
+[sub_resource type="Environment" id="env"]
+ambient_light_source = 1
+ambient_light_color = Color(0.4, 0.35, 0.5, 1)
+ambient_light_energy = 0.8
+fog_enabled = true
+fog_light_color = Color(0.15, 0.12, 0.2, 1)
+fog_density = 0.02
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+size = Vector3(20, 0.5, 20)
+material = SubResource("floor_mat")
+
+[sub_resource type="BoxMesh" id="wall_ns_mesh"]
+size = Vector3(20, 3, 0.5)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_ew_mesh"]
+size = Vector3(0.5, 3, 20)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_div1_mesh"]
+size = Vector3(0.5, 3, 8)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_div2_mesh"]
+size = Vector3(8, 3, 0.5)
+material = SubResource("wall_mat")
+
+[sub_resource type="CylinderMesh" id="player_mesh"]
+top_radius = 0.4
+bottom_radius = 0.4
+height = 1.6
+material = SubResource("player_mat")
+
+[sub_resource type="BoxMesh" id="enemy_mesh"]
+size = Vector3(0.8, 1.2, 0.8)
+material = SubResource("enemy_mat")
+
+[sub_resource type="BoxMesh" id="sword_mesh"]
+size = Vector3(0.15, 1.0, 0.15)
+material = SubResource("sword_mat")
+
+[sub_resource type="CylinderMesh" id="potion_mesh"]
+top_radius = 0.2
+bottom_radius = 0.2
+height = 0.5
+material = SubResource("potion_mat")
+
+[sub_resource type="CylinderMesh" id="portal_mesh"]
+top_radius = 1.0
+bottom_radius = 1.0
+height = 3.0
+radial_segments = 6
+material = SubResource("portal_mat")
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="DirectionalLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, 0.707, 0, -0.707, 0.707, 0, 8, 4)
+light_color = Color(1, 0.95, 0.9, 1)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866, 0, -0.866, 0.5, 0, 12, 8)
+current = true
+fov = 50.0
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+mesh = SubResource("floor_mesh")
+
+[node name="WallNorth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -10)
+mesh = SubResource("wall_ns_mesh")
+
+[node name="WallSouth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 10)
+mesh = SubResource("wall_ns_mesh")
+
+[node name="WallWest" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1.5, 0)
+mesh = SubResource("wall_ew_mesh")
+
+[node name="WallEast" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.5, 0)
+mesh = SubResource("wall_ew_mesh")
+
+[node name="WallDivider" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, -2)
+mesh = SubResource("wall_div1_mesh")
+
+[node name="WallDivider2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, 4)
+mesh = SubResource("wall_div2_mesh")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+script = ExtResource("player_script")
+
+[node name="Mesh" type="MeshInstance3D" parent="Player"]
+mesh = SubResource("player_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("player_shape")
+
+[node name="AttackArea" type="Area3D" parent="Player"]
+
+[node name="AttackShape" type="CollisionShape3D" parent="Player/AttackArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+shape = SubResource("attack_shape")
+
+[node name="Enemy1" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.6, -5)
+script = ExtResource("enemy_script")
+patrol_distance = 4.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy1"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy1"]
+shape = SubResource("enemy_shape")
+
+[node name="Enemy2" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.6, 5)
+script = ExtResource("enemy_script")
+patrol_distance = 3.0
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy2"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy2"]
+shape = SubResource("enemy_shape")
+
+[node name="Enemy3" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.6, 7)
+script = ExtResource("enemy_script")
+patrol_distance = 2.5
+
+[node name="Mesh" type="MeshInstance3D" parent="Enemy3"]
+mesh = SubResource("enemy_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemy3"]
+shape = SubResource("enemy_shape")
+
+[node name="Sword" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.8, 2)
+script = ExtResource("collectible_script")
+item_type = "sword"
+ammo_amount = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Sword"]
+mesh = SubResource("sword_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Sword"]
+shape = SubResource("collectible_shape")
+
+[node name="Potion" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0.8, -3)
+script = ExtResource("collectible_script")
+item_type = "potion"
+
+[node name="Mesh" type="MeshInstance3D" parent="Potion"]
+mesh = SubResource("potion_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Potion"]
+shape = SubResource("collectible_shape")
+
+[node name="Portal" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, -8)
+script = ExtResource("portal_script")
+next_floor_path = "res://scenes/DungeonFloor2.tscn"
+
+[node name="Mesh" type="MeshInstance3D" parent="Portal"]
+mesh = SubResource("portal_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Portal"]
+shape = SubResource("portal_shape")

@@ -1,0 +1,36 @@
+name: VisualSandboxIOS
+options:
+  bundleIdPrefix: com.example
+targets:
+  VisualSandboxIOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "14.0"
+    sources:
+      - GodotWrapper
+    settings:
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: NO
+      CODE_SIGNING_ALLOWED: NO
+      GENERATE_INFOPLIST_FILE: YES
+      OTHER_LDFLAGS: ["-lc++", "-ObjC"]
+    dependencies:
+      - framework: ../../output/ios/libgodot.xcframework
+        embed: true
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreHaptics.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreMotion.framework
+      - sdk: Foundation.framework
+      - sdk: GameController.framework
+      - sdk: MediaPlayer.framework
+      - sdk: Metal.framework
+      - sdk: OpenGLES.framework
+      - sdk: QuartzCore.framework
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: UIKit.framework
+      - sdk: ARKit.framework

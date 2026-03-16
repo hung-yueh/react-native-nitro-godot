@@ -1,0 +1,159 @@
+; NitroSwarm arena — top-down twin-stick demo
+; Arena: flat floor disk, 45° isometric camera, directional + ambient lights
+; Player spawns at origin, enemies are spawned by GameManager.gd
+
+[gd_scene load_steps=3 format=3 uid="uid://nitro_swarm"]
+
+[ext_resource type="Script" path="res://scripts/Player.gd" id="player_script"]
+[ext_resource type="Script" path="res://scripts/CameraFollow.gd" id="camera_script"]
+
+; ── Materials ───────────────────────────────────────────────────────────────
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_color = Color(0.12, 0.12, 0.18, 1)
+roughness = 0.9
+metallic = 0.1
+
+[sub_resource type="StandardMaterial3D" id="player_mat"]
+albedo_color = Color(0.2, 0.9, 0.4, 1)
+roughness = 0.4
+metallic = 0.3
+emission_enabled = true
+emission = Color(0.1, 0.5, 0.2, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="StandardMaterial3D" id="wall_mat"]
+albedo_color = Color(0.08, 0.08, 0.14, 1)
+roughness = 0.8
+
+; ── Meshes ───────────────────────────────────────────────────────────────────
+
+[sub_resource type="CylinderMesh" id="floor_mesh"]
+top_radius = 12.0
+bottom_radius = 12.0
+height = 0.3
+material = SubResource("floor_mat")
+
+[sub_resource type="BoxMesh" id="player_mesh"]
+size = Vector3(0.8, 1.4, 0.8)
+material = SubResource("player_mat")
+
+[sub_resource type="BoxMesh" id="wall_mesh_n"]
+size = Vector3(24.0, 2.0, 0.4)
+material = SubResource("wall_mat")
+
+[sub_resource type="BoxMesh" id="wall_mesh_e"]
+size = Vector3(0.4, 2.0, 24.0)
+material = SubResource("wall_mat")
+
+; ── Collision shapes ─────────────────────────────────────────────────────────
+
+[sub_resource type="CylinderShape3D" id="floor_col"]
+radius = 12.0
+height = 0.3
+
+[sub_resource type="CapsuleShape3D" id="player_col"]
+radius = 0.4
+height = 1.4
+
+[sub_resource type="BoxShape3D" id="wall_col_h"]
+size = Vector3(24.0, 2.0, 0.4)
+
+[sub_resource type="BoxShape3D" id="wall_col_v"]
+size = Vector3(0.4, 2.0, 24.0)
+
+[sub_resource type="BoxShape3D" id="attack_shape"]
+size = Vector3(1.8, 1.0, 1.8)
+
+; ── Scene tree ───────────────────────────────────────────────────────────────
+
+[node name="NitroSwarm" type="Node3D"]
+
+; ── Camera (isometric top-down, follows player position only) ───────────────
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.766, 0.643, 0, -0.643, 0.766, 0, 8, 10)
+current = true
+fov = 55.0
+script = ExtResource("camera_script")
+
+; ── Lighting ────────────────────────────────────────────────────────────────
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, 0.707, 0, -0.707, 0.707, 0, 10, 5)
+light_color = Color(1.0, 0.95, 0.9, 1)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+light_color = Color(0.4, 0.6, 1.0, 1)
+light_energy = 2.0
+omni_range = 20.0
+
+; ── Floor (StaticBody3D disk) ────────────────────────────────────────────────
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+mesh = SubResource("floor_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+shape = SubResource("floor_col")
+
+; ── Arena walls (4 sides) ────────────────────────────────────────────────────
+
+[node name="WallNorth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -12)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallNorth"]
+mesh = SubResource("wall_mesh_n")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallNorth"]
+shape = SubResource("wall_col_h")
+
+[node name="WallSouth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 12)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallSouth"]
+mesh = SubResource("wall_mesh_n")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallSouth"]
+shape = SubResource("wall_col_h")
+
+[node name="WallEast" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallEast"]
+mesh = SubResource("wall_mesh_e")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallEast"]
+shape = SubResource("wall_col_v")
+
+[node name="WallWest" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallWest"]
+mesh = SubResource("wall_mesh_e")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallWest"]
+shape = SubResource("wall_col_v")
+
+; ── Player (CharacterBody3D) ──────────────────────────────────────────────────
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+script = ExtResource("player_script")
+
+[node name="Mesh" type="MeshInstance3D" parent="Player"]
+mesh = SubResource("player_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("player_col")
+
+[node name="AttackArea" type="Area3D" parent="Player"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player/AttackArea"]
+shape = SubResource("attack_shape")

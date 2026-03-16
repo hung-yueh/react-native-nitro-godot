@@ -1,0 +1,22 @@
+diff --git a/platform/ios/detect.py b/platform/ios/detect.py
+index b7da135..a8a2f6b 100644
+--- a/platform/ios/detect.py
++++ b/platform/ios/detect.py
+@@ -51,7 +51,7 @@ def get_flags():
+         "target": "template_debug",
+         "use_volk": False,
+         "metal": True,
+-        "supported": ["metal", "mono"],
++        "supported": ["library", "metal", "mono"],
+         "builtin_pcre2_with_jit": False,
+     }
+ 
+@@ -155,7 +155,7 @@ def configure(env: "SConsEnvironment"):
+ 
+     if env["metal"] and env["simulator"]:
+         print_warning("iOS Simulator does not support the Metal rendering driver")
+-        env["metal"] = False
++        pass  # Patched: keep Metal on Apple Silicon simulators
+ 
+     if env["metal"]:
+         env.AppendUnique(CPPDEFINES=["METAL_ENABLED", "RD_ENABLED"])
