@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "net.libgodot.lab",
-      "appleTeamId": "ERN2P55L6C"
+      "appleTeamId": "YOUR_APPLE_TEAM_ID"
     },
     "android": {
       "adaptiveIcon": {

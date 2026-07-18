@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Memo } from '@legendapp/state/react';
 import { state$ } from 'react-native-nitro-godot';
 
@@ -50,7 +50,7 @@ export function LoadingScreen() {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(10, 10, 15, 0.92)',
     justifyContent: 'center',
     alignItems: 'center',

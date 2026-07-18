@@ -1,104 +1,109 @@
-# ⚔️ Dungeon Dash
+# ⚡ NitroSwarm
 
-A touch-controlled 3D dungeon crawler built with **react-native-nitro-godot**. This example exercises every epic and API surface of the library.
+A twin-stick arena shooter built with **react-native-nitro-godot** — demonstrating why you'd embed Godot inside React Native instead of building a standalone Godot app.
 
-## What It Tests
+## Why This Example Exists
 
-| Epic | Feature | How Tested |
-|------|---------|------------|
-| **1** | Lock-free SPSC messaging | ActionBar → `dispatchGameIntent()` → Godot processes → `STATE_SYNC` back |
-| **2** | OS lifecycle | Background app → `suspendOS()` + ghost touch release → resume |
-| **3** | Async scene loading | Portal → `loadSceneAsync()` → `LoadingScreen` with progress bar |
-| **4** | 3D→2D projection | `FloatingLabel` tracks a world-space position via `unprojectPosition()` |
-| **5** | CQRS state sync | `GameHUD` updates at 60Hz via Legend-State `<Memo>` — 0 re-renders |
-| — | Touch forwarding | Tap on `GodotView` → `sendTouchEvent` → player walks to tap position |
-| — | Zero-copy buffers | "Buffer" button → `createNativeArrayBuffer(1MB)` → `updateSharedBuffer()` |
+The key insight: **React Native builds the app, Godot renders the game.**
 
-## Setup
+- **Stats screen** — Rich scrollable UI, charts, data display → trivial in RN, painful in Godot
+- **Settings screen** — Sliders, toggles, segmented controls → RN does this natively
+- **Tab navigation** — Standard app shell pattern → impossible in Godot
+- **Zero-render HUD** — Legend-State `<Memo>` updates at 60Hz with 0 React re-renders
+- **3D→2D health bars** — `unprojectPosition()` JSI call anchors RN views to 3D world positions
+- **CQRS dispatch** — Settings changes flow from RN → C++ SPSC → GDScript instantly
 
-### 1. Build the Godot Project
+## What Each Tab Demonstrates
 
-```bash
-# Open the project in Godot 4.6 (master branch with libgodot C-API)
-# File path: examples/dungeon-dash/godot-project/
+| Tab | Library Feature | Why React Native Wins |
+|-----|----------------|----------------------|
+| 🎮 **Play** | `<GodotView>`, `useGodotEngine`, `NitroSwarmHUD` | Godot renders 3D; RN overlays HUD, joysticks, health bars |
+| 📊 **Stats** | `state$` (Legend-State observables) | ScrollView with live game data — 5 lines of RN vs. hundreds in Godot Control nodes |
+| ⚙️ **Settings** | `dispatchGameIntent()` | RN sliders → CQRS command → Godot applies change instantly |
 
-# From the Godot editor:
-# 1. Project → Export → Add Preset (any platform)
-# 2. Export PCK/ZIP → save as: examples/dungeon-dash/assets/game.pck
-```
-
-### 2. Enable the PCK in App.tsx
-
-Uncomment this line in `App.tsx`:
-
-```tsx
-const { pckPath, extracting, error } = usePckExtract(require('./assets/game.pck'));
-```
-
-### 3. Install & Run
+## Quick Start
 
 ```bash
 cd examples/dungeon-dash
 npm install
+
+# Build the .pck (requires Godot 4.7 with libgodot)
+npm run export-pck
+
+# Run on device
 npx expo run:ios      # or: npx expo run:android
 ```
 
 ## Architecture
 
 ```
-┌────────────────────────────────────┐
-│  React Native                      │
-│                                    │
-│   App.tsx                          │
-│     ├─ useGodotEngine(pckPath)     │
-│     ├─ <GodotView>   (touch fwd)  │
-│     ├─ <GameHUD>     (zero-render) │
-│     ├─ <ActionBar>   (CQRS)       │
-│     ├─ <FloatingLabel>(3D→2D)     │
-│     └─ <LoadingScreen>(async)     │
-├────────────────────────────────────┤
-│  Godot (headless, background thread)│
-│                                    │
-│   Main.tscn                        │
-│     ├─ Player (CharacterBody3D)    │
-│     ├─ Enemy × 3 (patrol/chase)   │
-│     ├─ Sword + Potion (pickups)   │
-│     └─ Portal → DungeonFloor2     │
-└────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  React Native (App Shell)                    │
+│                                              │
+│  ┌─ Tab: Play ─────────────────────────────┐ │
+│  │  <GodotView>        3D rendering        │ │
+│  │  <GameHUD>          Zero-render (Memo)   │ │
+│  │  <NitroSwarmHUD>    Twin-stick joysticks │ │
+│  │  <EnemyHealthBars>  3D→2D projection    │ │
+│  │  <ActionBar>        CQRS dispatch       │ │
+│  │  <RenderCounter>    Proves 0 re-renders │ │
+│  └──────────────────────────────────────────┘ │
+│  ┌─ Tab: Stats ────────────────────────────┐ │
+│  │  Pure React Native — reads state$       │ │
+│  └──────────────────────────────────────────┘ │
+│  ┌─ Tab: Settings ─────────────────────────┐ │
+│  │  RN controls → dispatchGameIntent()     │ │
+│  └──────────────────────────────────────────┘ │
+├──────────────────────────────────────────────┤
+│  Godot (headless, background thread)         │
+│                                              │
+│  NitroSwarm.tscn                             │
+│    ├─ Player (twin-stick CharacterBody3D)    │
+│    ├─ Enemy × N (patrol/chase AI, waves)     │
+│    ├─ Collectibles (weapons, potions)        │
+│    ├─ Portal → async floor transition        │
+│    └─ RNBridge (SPSC ↔ state sync @ 60Hz)    │
+└──────────────────────────────────────────────┘
 ```
 
 ## Game Controls
 
-- **Tap on the Godot view** → Player walks to that position
-- **⚔️ Attack** → Melee swing (damages nearby enemies)
-- **🧪 Potion** → Restore 30 HP
-- **🔧 Equip** → Cycle through collected weapons
-- **📦 Buffer** → Tests the zero-copy ArrayBuffer pipeline
+- **Left joystick** → Move
+- **Right joystick** → Aim (auto-attacks when active)
+- **⚔️ Attack** → Melee swing
+- **🧪 Potion** → Restore HP
+- **🔧 Equip** → Cycle weapons
+- **📦 Buffer** → Test zero-copy ArrayBuffer pipeline
 
 ## Project Structure
 
 ```
 examples/dungeon-dash/
-├── App.tsx                      # Main game screen
+├── App.tsx                          # Root app with tab navigation
 ├── components/
-│   ├── GameHUD.tsx              # Zero-render HUD (Epic 5)
-│   ├── FloatingLabel.tsx        # 3D→2D projection (Epic 4)
-│   ├── LoadingScreen.tsx        # Async loading overlay (Epic 3)
-│   └── ActionBar.tsx            # CQRS intent dispatch (Epic 5)
+│   ├── GameHUD.tsx                  # Zero-render HUD (Legend-State <Memo>)
+│   ├── EnemyHealthBars.tsx          # 3D→2D projected health bars
+│   ├── ActionBar.tsx                # CQRS intent dispatch buttons
+│   ├── FloatingLabel.tsx            # 3D→2D projected label
+│   ├── LoadingScreen.tsx            # Async floor loading overlay
+│   └── RenderCounter.tsx            # Visual proof of zero re-renders
+├── screens/
+│   ├── StatsScreen.tsx              # Pure RN stats dashboard
+│   └── SettingsScreen.tsx           # Settings → CQRS → Godot
 ├── godot-project/
-│   ├── project.godot            # Godot project config
+│   ├── project.godot
 │   ├── scripts/
-│   │   ├── RNBridge.gd          # Bridge singleton (AutoLoad)
-│   │   ├── Player.gd            # Player controller
-│   │   ├── Enemy.gd             # Enemy AI
-│   │   ├── Collectible.gd       # Item pickups
-│   │   └── Portal.gd            # Floor transition
+│   │   ├── RNBridge.gd              # Bridge singleton (AutoLoad)
+│   │   ├── Player.gd                # Twin-stick player controller
+│   │   ├── Enemy.gd                 # Patrol/chase AI
+│   │   ├── GameManager.gd           # Wave spawner + scoring
+│   │   ├── Collectible.gd           # Item pickups
+│   │   └── Portal.gd               # Floor transition
 │   └── scenes/
-│       ├── Main.tscn            # Floor 1 (L-shaped dungeon)
-│       └── DungeonFloor2.tscn   # Floor 2 (async loaded)
+│       ├── NitroSwarm.tscn          # Main arena
+│       └── DungeonFloor2.tscn       # Async-loaded floor 2
 ├── package.json
 ├── app.json
 ├── metro.config.js
-├── tsconfig.json
 └── index.js
 ```

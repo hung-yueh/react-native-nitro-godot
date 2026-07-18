@@ -361,10 +361,18 @@ void HybridGodotEngine::start() {
   // g_godot_init_attempted is a FILE-STATIC (not member) so a new
   // HybridGodotEngine object (e.g. from Expo hot reload) won't bypass it.
   if (g_godot_init_attempted) {
-    LOGI("start() — Godot init already attempted, resuming (no re-init)\n");
-    godot_instance_ = g_godot_instance;  // reuse existing instance
-    is_running_ = true;
-    is_paused_  = false;
+    // Godot cannot be restarted in this process: destroy() joined the render
+    // thread (RenderingServer has thread affinity to it, so a fresh thread
+    // can't drive iteration()) and stored live=false into the shared
+    // GDExtension state. Pretending to resume here (is_running_=true) would
+    // leave JS in 'running' with a permanently frozen view and no diagnostic.
+    // Surface an explicit ENGINE_ERROR instead — the producer thread is
+    // joined, so _setLastError() may safely enqueue from this thread. Full
+    // remount resumption requires promoting the render loop to a process-
+    // global thread that survives destroy() — tracked in ARCHITECTURE.md.
+    LOGE("start() — Godot was already started once in this process and cannot restart after destroy()\n");
+    _setLastError("lifecycle",
+                  "Godot cannot restart after destroy() in this process — reload the app to restart the engine");
     return;
   }
 
@@ -386,6 +394,11 @@ void HybridGodotEngine::start() {
 
   render_thread_ = std::thread([this, gdext_state_copy]() {
     LOGI("render_thread_ started\n");
+
+    // Record the producer thread id so _setLastError() knows it is safe to
+    // enqueue ENGINE_ERROR messages into the single-producer _message_queue
+    // from here (and only from here).
+    producer_thread_id_.store(std::this_thread::get_id(), std::memory_order_release);
 
     // ── Wait for surface from React Native ──────────────────────────────
     // The <GodotView> component fires onSurfaceCreated which calls
@@ -719,6 +732,10 @@ void HybridGodotEngine::destroy() {
 
   _stopAndJoinThread();
 
+  // Render thread is joined — safe to clear the Godot-thread-only RNBridge cache.
+  _rnbridge_obj_ = nullptr;
+  _rnbridge_id_  = 0;
+
   // Release our reference; the lambda's reference will drop when the thread exits.
   gdext_state_.reset();
   LOGI("destroy() complete\n");
@@ -797,28 +814,134 @@ void HybridGodotEngine::notifyPollingStopped() {
 // ─── setOnWakeUp (Epic 1: Wake-Up Protocol) ─────────────────────────────────
 
 void HybridGodotEngine::setOnWakeUp(const std::function<void()>& callback) {
+  // Stored for a future CallInvoker-based wake-up. NOTE: this callback is NOT
+  // currently invoked from C++ — see enqueueMessageFromGodot() for why calling
+  // it from the Godot thread would be a JSI threading violation. The JS layer
+  // drives a continuous rAF drain loop in the meantime.
   _onWakeUp = callback;
-  LOGI("setOnWakeUp() — JS wake-up callback registered\n");
+  LOGI("setOnWakeUp() — JS wake-up callback registered (drain loop drives polling)\n");
 }
 
 // ─── enqueueMessageFromGodot (SPSC Producer, Epic 1) ────────────────────────
 //
-// Called from the Godot/render thread to push messages into the SPSC queue.
-// If JS isn't actively polling, sets the wake-up flag.
-// NOTE: The CallInvoker wake-up is scaffolded but not yet wired — need to
-// inject CallInvoker from the JS layer. For now, JS must still poll.
+// The single producer side of _message_queue. MUST only be called from the
+// render/Godot thread (the SPSC single-producer invariant; enforced for the
+// error path by the producer-thread gate in _setLastError).
 //
 
 void HybridGodotEngine::enqueueMessageFromGodot(const std::string& msg) {
   _message_queue.enqueue(msg);
 
-  // If JS isn't polling, signal it should start.
-  if (!_is_js_polling.exchange(true, std::memory_order_acq_rel)) {
-    // JS was NOT polling — invoke the wake-up callback to start the drain loop.
-    if (_onWakeUp) {
-      _onWakeUp();
+  // Mark that work is pending for the JS drain loop. We deliberately do NOT
+  // invoke _onWakeUp() from here: it is a JS function, and calling it on the
+  // Godot render thread would execute JS off the JS thread, corrupting the
+  // (single-threaded) JSI runtime. The JS side already runs a continuous rAF
+  // drain loop while mounted, so enqueued messages are consumed on the next
+  // frame. A true on-demand wake-up must be routed through Nitro's CallInvoker
+  // so the callback runs on the JS thread — see setOnWakeUp().
+  _is_js_polling.store(true, std::memory_order_release);
+}
+
+// ─── _getBridgeVariant (cached /root/RNBridge resolver) ─────────────────────
+//
+// Resolves the RNBridge AutoLoad node once and caches the raw pointer, then
+// re-wraps it as an OBJECT Variant on every call. See header for rationale.
+// Godot-thread-only — no synchronisation.
+//
+
+bool HybridGodotEngine::_getBridgeVariant(const GDExtensionProcs& P, VSlot& out_bridge) {
+  auto obj_to_variant = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_OBJECT);
+  if (!obj_to_variant) return false;
+
+  // Fast path: re-wrap the cached AutoLoad node pointer (no navigation) —
+  // but revalidate it first via ObjectID. If the node was freed (consumer
+  // GDScript queue_free'ing/replacing the AutoLoad), object_get_instance_from_id
+  // returns null and we drop the cache instead of variant_calling freed memory.
+  if (_rnbridge_obj_) {
+    if (_rnbridge_id_ != 0 && P.obj_get_instance_from_id) {
+      if (P.obj_get_instance_from_id(_rnbridge_id_) == nullptr) {
+        LOGE("_getBridgeVariant: cached RNBridge node was freed — re-resolving\n");
+        _rnbridge_obj_ = nullptr;
+        _rnbridge_id_  = 0;
+        // fall through to the slow path to re-resolve (or fail safely)
+      }
+    }
+    if (_rnbridge_obj_) {
+      obj_to_variant(out_bridge.data, &_rnbridge_obj_);
+      return true;
     }
   }
+
+  // Slow path (first call only): Engine → get_main_loop → get_root → get_node.
+  SNSlot sn_engine_name;
+  P.sn_new(sn_engine_name.data, "Engine", false);
+  GDExtensionObjectPtr engine_obj = P.get_singleton(sn_engine_name.data);
+  if (P.sn_destroy) P.sn_destroy(sn_engine_name.data);
+  if (!engine_obj) return false;
+
+  VSlot var_engine;
+  obj_to_variant(var_engine.data, &engine_obj);
+
+  SNSlot sn_get_main_loop;
+  P.sn_new(sn_get_main_loop.data, "get_main_loop", false);
+  VSlot var_tree;
+  P.var_new_nil(var_tree.data);
+  GDExtensionCallError err{};
+  P.var_call(var_engine.data, sn_get_main_loop.data, nullptr, 0, var_tree.data, &err);
+  if (P.sn_destroy) P.sn_destroy(sn_get_main_loop.data);
+  P.var_destroy(var_engine.data);
+  if (err.error != GDEXTENSION_CALL_OK) { P.var_destroy(var_tree.data); return false; }
+
+  SNSlot sn_get_root;
+  P.sn_new(sn_get_root.data, "get_root", false);
+  VSlot var_root;
+  P.var_new_nil(var_root.data);
+  GDExtensionCallError root_err{};
+  P.var_call(var_tree.data, sn_get_root.data, nullptr, 0, var_root.data, &root_err);
+  if (P.sn_destroy) P.sn_destroy(sn_get_root.data);
+  P.var_destroy(var_tree.data);
+  if (root_err.error != GDEXTENSION_CALL_OK) { P.var_destroy(var_root.data); return false; }
+
+  SNSlot sn_get_node;
+  P.sn_new(sn_get_node.data, "get_node", false);
+  alignas(void*) uint8_t gd_path_str[kStringSize] = {};
+  P.str_new_utf8(gd_path_str, "/root/RNBridge");
+  auto str_to_variant = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
+  VSlot var_path;
+  if (str_to_variant) str_to_variant(var_path.data, gd_path_str);
+  else P.var_new_nil(var_path.data);
+  if (P.str_destroy) P.str_destroy(gd_path_str);
+
+  const GDExtensionConstVariantPtr path_args[1] = { var_path.data };
+  VSlot var_bridge_node;
+  P.var_new_nil(var_bridge_node.data);
+  GDExtensionCallError node_err{};
+  P.var_call(var_root.data, sn_get_node.data, path_args, 1, var_bridge_node.data, &node_err);
+  if (P.sn_destroy) P.sn_destroy(sn_get_node.data);
+  P.var_destroy(var_path.data);
+  P.var_destroy(var_root.data);
+  if (node_err.error != GDEXTENSION_CALL_OK) { P.var_destroy(var_bridge_node.data); return false; }
+
+  // Extract and cache the raw Node pointer (stable AutoLoad). If RNBridge is not
+  // in the tree yet (startup ordering), bridge_obj stays null and we retry next
+  // frame without caching.
+  GDExtensionObjectPtr bridge_obj = nullptr;
+  if (P.get_type_from_var) {
+    auto obj_from_variant = P.get_type_from_var(GDEXTENSION_VARIANT_TYPE_OBJECT);
+    if (obj_from_variant) obj_from_variant(&bridge_obj, var_bridge_node.data);
+  }
+  P.var_destroy(var_bridge_node.data);
+
+  if (!bridge_obj) return false;
+  _rnbridge_obj_ = bridge_obj;
+  // Capture the ObjectID for per-call liveness revalidation (0 if the
+  // liveness procs are unavailable on this Godot build — then the fast path
+  // skips revalidation, matching the previous behavior).
+  _rnbridge_id_ = (P.obj_get_instance_id != nullptr)
+                      ? P.obj_get_instance_id(bridge_obj)
+                      : 0;
+  obj_to_variant(out_bridge.data, &_rnbridge_obj_);
+  return true;
 }
 
 // ─── _relayGodotMessages (Interim Bridge) ────────────────────────────────────
@@ -839,70 +962,10 @@ void HybridGodotEngine::_relayGodotMessages() {
 
   const auto& P = gdext_state_->procs;
 
-  // Navigate to RNBridge via Engine.get_main_loop().get_root()
-  // Note: SceneTree is NOT an Engine singleton — it's the main loop.
-  // global_get_singleton("SceneTree") always returns nullptr.
-  SNSlot sn_engine_name;
-  P.sn_new(sn_engine_name.data, "Engine", false);
-  GDExtensionObjectPtr engine_obj = P.get_singleton(sn_engine_name.data);
-  if (P.sn_destroy) P.sn_destroy(sn_engine_name.data);
-  if (!engine_obj) return;
-
-  auto obj_to_variant = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_OBJECT);
-  if (!obj_to_variant) return;
-
-  VSlot var_engine;
-  obj_to_variant(var_engine.data, &engine_obj);
-
-  // Engine.get_main_loop() → SceneTree
-  SNSlot sn_get_main_loop;
-  P.sn_new(sn_get_main_loop.data, "get_main_loop", false);
-  VSlot var_tree;
-  P.var_new_nil(var_tree.data);
-  GDExtensionCallError err{};
-  P.var_call(var_engine.data, sn_get_main_loop.data, nullptr, 0, var_tree.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_main_loop.data);
-  P.var_destroy(var_engine.data);
-  if (err.error != GDEXTENSION_CALL_OK) return;
-
-  // SceneTree.get_root()
-  SNSlot sn_get_root;
-  P.sn_new(sn_get_root.data, "get_root", false);
-  VSlot var_root;
-  P.var_new_nil(var_root.data);
-  GDExtensionCallError root_err{};
-  P.var_call(var_tree.data, sn_get_root.data, nullptr, 0, var_root.data, &root_err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_root.data);
-  if (root_err.error != GDEXTENSION_CALL_OK) {
-    P.var_destroy(var_tree.data);
-    return;
-  }
-
-  SNSlot sn_get_node;
-  P.sn_new(sn_get_node.data, "get_node", false);
-  alignas(void*) uint8_t gd_path_str[kStringSize] = {};
-  P.str_new_utf8(gd_path_str, "/root/RNBridge");
-  auto str_to_variant = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
-  VSlot var_path;
-  if (str_to_variant) {
-    str_to_variant(var_path.data, gd_path_str);
-  } else {
-    P.var_new_nil(var_path.data);
-  }
-  if (P.str_destroy) P.str_destroy(gd_path_str);
-
-  const GDExtensionConstVariantPtr path_args[1] = { var_path.data };
+  // Resolve the RNBridge AutoLoad node (cached after first frame).
   VSlot var_bridge_node;
-  P.var_new_nil(var_bridge_node.data);
-  P.var_call(var_root.data, sn_get_node.data, path_args, 1, var_bridge_node.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_node.data);
-  P.var_destroy(var_path.data);
-  P.var_destroy(var_root.data);
-  P.var_destroy(var_tree.data);
-
-  if (err.error != GDEXTENSION_CALL_OK) {
-    return;
-  }
+  if (!_getBridgeVariant(P, var_bridge_node)) return;
+  GDExtensionCallError err{};
 
   // Drain RNBridge._outgoing_queue → SPSC queue
   // Call poll_message() in a loop until we get an empty string.
@@ -967,68 +1030,10 @@ void HybridGodotEngine::_updateCameraCache() {
 
   const auto& P = gdext_state_->procs;
 
-  // Navigate to RNBridge node
-  // Get SceneTree via Engine.get_main_loop() (SceneTree is NOT an Engine singleton)
-  SNSlot sn_engine_name;
-  P.sn_new(sn_engine_name.data, "Engine", false);
-  GDExtensionObjectPtr engine_obj = P.get_singleton(sn_engine_name.data);
-  if (P.sn_destroy) P.sn_destroy(sn_engine_name.data);
-  if (!engine_obj) return;
-
-  auto obj_to_var_local = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_OBJECT);
-  if (!obj_to_var_local) return;
-
-  VSlot var_engine;
-  obj_to_var_local(var_engine.data, &engine_obj);
-
-  SNSlot sn_get_main_loop;
-  P.sn_new(sn_get_main_loop.data, "get_main_loop", false);
-  VSlot var_scene_tree;
-  P.var_new_nil(var_scene_tree.data);
-  GDExtensionCallError ml_err{};
-  P.var_call(var_engine.data, sn_get_main_loop.data, nullptr, 0, var_scene_tree.data, &ml_err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_main_loop.data);
-  P.var_destroy(var_engine.data);
-  if (ml_err.error != GDEXTENSION_CALL_OK) return;
-
-  // SceneTree is already in var_scene_tree as a Variant. Call get_root() on it.
-  SNSlot sn_get_root;
-  P.sn_new(sn_get_root.data, "get_root", false);
-  VSlot var_root;
-  P.var_new_nil(var_root.data);
-  GDExtensionCallError err{};
-  P.var_call(var_scene_tree.data, sn_get_root.data, nullptr, 0, var_root.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_root.data);
-  if (err.error != GDEXTENSION_CALL_OK) {
-    P.var_destroy(var_scene_tree.data);
-    return;
-  }
-
-  SNSlot sn_get_node;
-  P.sn_new(sn_get_node.data, "get_node", false);
-  alignas(void*) uint8_t gd_path_str[kStringSize] = {};
-  P.str_new_utf8(gd_path_str, "/root/RNBridge");
-  auto str_to_variant = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
-  VSlot var_path;
-  if (str_to_variant) {
-    str_to_variant(var_path.data, gd_path_str);
-  } else {
-    P.var_new_nil(var_path.data);
-  }
-  if (P.str_destroy) P.str_destroy(gd_path_str);
-
-  const GDExtensionConstVariantPtr path_args[1] = { var_path.data };
+  // Resolve the RNBridge AutoLoad node (cached after first frame).
   VSlot var_bridge_node;
-  P.var_new_nil(var_bridge_node.data);
-  P.var_call(var_root.data, sn_get_node.data, path_args, 1, var_bridge_node.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_node.data);
-  P.var_destroy(var_path.data);
-  P.var_destroy(var_root.data);
-  P.var_destroy(var_scene_tree.data);
-
-  if (err.error != GDEXTENSION_CALL_OK) {
-    return;
-  }
+  if (!_getBridgeVariant(P, var_bridge_node)) return;
+  GDExtensionCallError err{};
 
   // Call RNBridge.get_camera_data() → returns PackedFloat32Array(34)
   SNSlot sn_get_cam;
@@ -1691,62 +1696,11 @@ void HybridGodotEngine::_processInboundMessages() {
 
   const auto& P = gdext_state_->procs;
 
-  // ── Cache SceneTree → RNBridge node lookup (once per frame) ─────────────
-  // Get SceneTree via Engine.get_main_loop() (SceneTree is NOT an Engine singleton)
-  SNSlot sn_engine_name;
-  P.sn_new(sn_engine_name.data, "Engine", false);
-  GDExtensionObjectPtr engine_obj = P.get_singleton(sn_engine_name.data);
-  if (P.sn_destroy) P.sn_destroy(sn_engine_name.data);
-  if (!engine_obj) return;
-
-  auto obj_to_var_cam = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_OBJECT);
-  if (!obj_to_var_cam) return;
-
-  VSlot var_engine_cam;
-  obj_to_var_cam(var_engine_cam.data, &engine_obj);
-
-  SNSlot sn_get_main_loop_cam;
-  P.sn_new(sn_get_main_loop_cam.data, "get_main_loop", false);
-  VSlot var_scene_tree_cam;
-  P.var_new_nil(var_scene_tree_cam.data);
-  GDExtensionCallError ml_err_cam{};
-  P.var_call(var_engine_cam.data, sn_get_main_loop_cam.data, nullptr, 0, var_scene_tree_cam.data, &ml_err_cam);
-  if (P.sn_destroy) P.sn_destroy(sn_get_main_loop_cam.data);
-  P.var_destroy(var_engine_cam.data);
-  if (ml_err_cam.error != GDEXTENSION_CALL_OK) return;
-
-  // SceneTree is already in var_scene_tree_cam as a Variant. Call get_root() on it.
-  SNSlot sn_get_root;
-  P.sn_new(sn_get_root.data, "get_root", false);
-  VSlot var_root;
-  P.var_new_nil(var_root.data);
-  GDExtensionCallError err{};
-  P.var_call(var_scene_tree_cam.data, sn_get_root.data, nullptr, 0, var_root.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_root.data);
-  if (err.error != GDEXTENSION_CALL_OK) {
-    P.var_destroy(var_scene_tree_cam.data);
-    return;
-  }
-
-  SNSlot sn_get_node;
-  P.sn_new(sn_get_node.data, "get_node", false);
-  alignas(void*) uint8_t gd_path[kStringSize] = {};
-  P.str_new_utf8(gd_path, "/root/RNBridge");
-  auto str_to_var = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
-  VSlot var_path;
-  if (str_to_var) str_to_var(var_path.data, gd_path);
-  else P.var_new_nil(var_path.data);
-  if (P.str_destroy) P.str_destroy(gd_path);
-
-  const GDExtensionConstVariantPtr path_args[1] = { var_path.data };
+  // Resolve the RNBridge AutoLoad node (cached after first frame).
   VSlot var_bridge;
-  P.var_new_nil(var_bridge.data);
-  P.var_call(var_root.data, sn_get_node.data, path_args, 1, var_bridge.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_node.data);
-  P.var_destroy(var_path.data);
-  P.var_destroy(var_root.data);
-  P.var_destroy(var_scene_tree_cam.data);
-  if (err.error != GDEXTENSION_CALL_OK) return;
+  if (!_getBridgeVariant(P, var_bridge)) return;
+  auto str_to_var = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
+  GDExtensionCallError err{};
 
   // ── Drain loop: dispatch up to 64 messages ────────────────────────────
   SNSlot sn_receive;
@@ -1852,63 +1806,11 @@ void HybridGodotEngine::_processInboundTouches() {
   }
 
   // ── Set RNBridge.joystick_move / joystick_aim directly ────────────────────
-  // Navigate: SceneTree → root → get_node("/root/RNBridge")
-  //           then call variant_set with property name + Vector2 value.
-
-  // Get Engine singleton → get_main_loop() → SceneTree
-  SNSlot sn_engine;
-  P.sn_new(sn_engine.data, "Engine", false);
-  GDExtensionObjectPtr engine_obj = P.get_singleton(sn_engine.data);
-  if (P.sn_destroy) P.sn_destroy(sn_engine.data);
-  if (!engine_obj) { LOGE("_processInboundTouches: Engine singleton not found\n"); return; }
-
-  auto obj_to_var = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_OBJECT);
-  VSlot var_engine;
-  obj_to_var(var_engine.data, &engine_obj);
-
-  // Engine.get_main_loop() → SceneTree
-  SNSlot sn_get_main_loop;
-  P.sn_new(sn_get_main_loop.data, "get_main_loop", false);
-  VSlot var_scene_tree;
-  P.var_new_nil(var_scene_tree.data);
-  GDExtensionCallError err{};
-  P.var_call(var_engine.data, sn_get_main_loop.data, nullptr, 0, var_scene_tree.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_main_loop.data);
-  P.var_destroy(var_engine.data);
-  if (err.error != GDEXTENSION_CALL_OK) { LOGE("_processInboundTouches: get_main_loop() failed\n"); return; }
-
-  // SceneTree.get_root()
-  SNSlot sn_get_root;
-  P.sn_new(sn_get_root.data, "get_root", false);
-  VSlot var_root;
-  P.var_new_nil(var_root.data);
-  P.var_call(var_scene_tree.data, sn_get_root.data, nullptr, 0, var_root.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_root.data);
-  P.var_destroy(var_scene_tree.data);
-  if (err.error != GDEXTENSION_CALL_OK) { LOGE("_processInboundTouches: get_root() failed\n"); return; }
-
-  // root.get_node("/root/RNBridge")
-  // Build the NodePath as a Variant<String>
-  auto str_to_var = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
-
-  if (!P.str_new_latin1 || !str_to_var) { P.var_destroy(var_root.data); return; }
-
-  alignas(void*) uint8_t gd_path[kStringSize] = {};
-  P.str_new_latin1(gd_path, "RNBridge");
-  VSlot var_path;
-  str_to_var(var_path.data, gd_path);
-  if (P.str_destroy) P.str_destroy(gd_path);
-
-  SNSlot sn_get_node;
-  P.sn_new(sn_get_node.data, "get_node", false);
-  const GDExtensionConstVariantPtr get_node_args[1] = { var_path.data };
+  // Resolve the RNBridge AutoLoad node (cached after first frame), then set
+  // joystick_move / joystick_aim via Object.set(name, Vector2).
   VSlot var_bridge;
-  P.var_new_nil(var_bridge.data);
-  P.var_call(var_root.data, sn_get_node.data, get_node_args, 1, var_bridge.data, &err);
-  if (P.sn_destroy) P.sn_destroy(sn_get_node.data);
-  P.var_destroy(var_path.data);
-  P.var_destroy(var_root.data);
-  if (err.error != GDEXTENSION_CALL_OK) { LOGE("_processInboundTouches: get_node(RNBridge) failed (%d)\n", err.error); return; }
+  if (!_getBridgeVariant(P, var_bridge)) return;
+  auto str_to_var = P.get_var_from_type(GDEXTENSION_VARIANT_TYPE_STRING);
 
 
   // Helper: set a Vector2 property on var_bridge using Object.set(name, value)
@@ -2101,6 +2003,10 @@ void HybridGodotEngine::_stopAndJoinThread() {
   // (Main::cleanup leaves dangling global pointers).
   if (render_thread_.joinable()) {
     render_thread_.join();
+    // The producer thread is gone: reset the id so _setLastError() knows it
+    // may enqueue from any thread again (and so a recycled OS thread id can
+    // never spuriously pass the producer gate).
+    producer_thread_id_.store(std::thread::id{}, std::memory_order_release);
   }
 }
 
@@ -2146,9 +2052,21 @@ void HybridGodotEngine::_setLastError(const std::string& layer, const std::strin
   }
   LOGE("ENGINE_ERROR: %s\n", full.c_str());
 
-  // Also push to SPSC so JS can detect errors via the normal message drain loop
-  std::string json = "{\"type\":\"ENGINE_ERROR\",\"layer\":\"" + layer + "\",\"error\":\"" + msg + "\"}";
-  enqueueMessageFromGodot(json);
+  // Push to the SPSC queue so JS surfaces the error via the normal drain loop.
+  // Enqueuing is safe from exactly two situations:
+  //   1. We ARE the single producer (render/Godot) thread, or
+  //   2. No render thread is alive (producer_thread_id_ is the default id —
+  //      it is only set inside the render-thread lambda and reset by
+  //      _stopAndJoinThread() after the join) — with no producer running,
+  //      this thread is momentarily the sole producer.
+  // Case 2 covers JS-thread errors like "start() called before initialize()"
+  // and post-destroy() lifecycle errors, which would otherwise never reach
+  // the JS ENGINE_ERROR handler (nothing in JS polls getLastError()).
+  const auto producer_id = producer_thread_id_.load(std::memory_order_acquire);
+  if (std::this_thread::get_id() == producer_id || producer_id == std::thread::id{}) {
+    std::string json = "{\"type\":\"ENGINE_ERROR\",\"layer\":\"" + layer + "\",\"error\":\"" + msg + "\"}";
+    enqueueMessageFromGodot(json);
+  }
 }
 
 }  // namespace margelo::nitro::godot

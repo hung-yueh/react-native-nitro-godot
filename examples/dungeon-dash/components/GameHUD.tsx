@@ -15,37 +15,15 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Memo } from '@legendapp/state/react';
 import { state$ } from 'react-native-nitro-godot';
-
-// ─── Health Bar (width-reactive, no re-renders) ─────────────────────────────
-
-const HealthFill = () => {
-  // This component body runs exactly ONCE
-  return (
-    <Memo>
-      {() => {
-        const health = state$.player.health.get();
-        const pct = Math.max(0, Math.min(100, health)) / 100;
-        const color =
-          pct > 0.6 ? '#4ade80' : pct > 0.3 ? '#fbbf24' : '#f87171';
-        return (
-          <View
-            style={[
-              styles.healthFill,
-              { width: `${pct * 100}%` as any, backgroundColor: color },
-            ]}
-          />
-        );
-      }}
-    </Memo>
-  );
-};
+import { HealthFill } from './HealthFill';
+import { TOP_INSET } from './insets';
 
 // ─── Main HUD ───────────────────────────────────────────────────────────────
 
 export const GameHUD = () => {
-  // This function runs exactly once — no re-renders on state changes
+  // Sit below the top safe area (and below NitroSwarmHUD's score bar).
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View style={[styles.container, { top: TOP_INSET + 40 }]} pointerEvents="none">
       {/* Health Bar */}
       <View style={styles.statRow}>
         <Text style={styles.statIcon}>❤️</Text>
@@ -117,10 +95,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 4,
     overflow: 'hidden',
-  },
-  healthFill: {
-    height: '100%',
-    borderRadius: 4,
   },
   healthText: {
     color: '#e0e7ff',

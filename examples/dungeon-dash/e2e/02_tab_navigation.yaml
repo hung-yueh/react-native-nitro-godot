@@ -1,0 +1,28 @@
+# 02 — Tab navigation: each tab renders, and the Godot engine survives a full
+# round-trip (regression: tab switching used to kill the render surface).
+appId: net.libgodot.nitroswarm
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+
+# → Stats
+- tapOn: "Stats"
+- assertVisible: "LIVE STATS"
+- assertVisible: "GAME STATUS"
+- assertVisible: "PLAYER STATUS"
+
+# → Settings
+- tapOn: "Settings"
+- assertVisible: "Sound Volume"
+- assertVisible: "Camera Zoom"
+- assertVisible: "Difficulty"
+
+# → back to Play: engine must still be running (not black/frozen/error)
+- tapOn: "Play"
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 10000
+- assertNotVisible: "LIVE STATS"
+- assertNotVisible: "Sound Volume"

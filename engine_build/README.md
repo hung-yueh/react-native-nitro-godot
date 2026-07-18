@@ -2,7 +2,7 @@
 
 Automated pipeline to download, patch, and compile **Godot 4.x** as an optimised shared library for Android and iOS, for use as the native engine backend in a React Native Nitro module.
 
-The Godot version is pinned in the [`GODOT_VERSION`](./GODOT_VERSION) file (currently **4.7-dev2**).
+The Godot version is pinned in the [`GODOT_VERSION`](./GODOT_VERSION) file (currently **4.7-stable**).
 
 ---
 
@@ -113,15 +113,22 @@ The build script runs four gates after compilation. Any failure exits with **cod
 To upgrade the Godot engine version:
 
 ```bash
-# 1. Edit the pinned version (e.g. to 4.7-dev3)
-echo "4.7-dev3" > engine_build/GODOT_VERSION
+# 1. Find the source commit for the target build. Pre-release tags
+#    (dev/beta/rc) live in the godotengine/godot-builds repo, NOT the main
+#    source repo — the release notes list the source commit:
+#      https://github.com/godotengine/godot/releases/tag/4.7-stable
+#      → "Built from commit <SHA>"
 
-# 2. Rebuild (stale source is auto-detected and re-downloaded)
+# 2. Pin both the version label and that commit (format: VERSION COMMIT_HASH).
+echo "4.7-stable 5b4e0cb0fd279832bbdd69fed5354d4e5ad26f88" > engine_build/GODOT_VERSION
+
+# 3. Rebuild (stale source is auto-detected and re-downloaded; the build
+#    exports GODOT_VERSION_STATUS, e.g. "rc2", so the engine self-identifies).
 bash engine_build/build_godot.sh
 
-# 3. If patches fail to apply, regenerate them (see patches/README.md)
+# 4. If patches fail to apply, regenerate them (see patches/README.md)
 
-# 4. Re-export the game PCK with the new editor
+# 5. Re-export the game PCK with the matching editor build
 cd examples/dungeon-dash && npm run export-pck
 ```
 

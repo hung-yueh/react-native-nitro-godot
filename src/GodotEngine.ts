@@ -2,15 +2,18 @@
  * GodotEngine.ts — High-level TypeScript wrapper for the GodotEngine HybridObject.
  *
  * Provides:
- *   - Event-driven message handling (no manual polling)
- *   - Hybrid wake-up drain loop (rAF-based, only active when messages pending)
+ *   - Event-driven message handling via a rAF drain loop
  *   - Integration point for CQRS state ingestion (Epic 5)
  *
  * Architecture:
- *   JS does NOT poll by default. When C++ enqueues a message and sets the
- *   wake-up flag, it invokes the setOnWakeUp callback (via Nitro's CallInvoker),
- *   which kicks off a requestAnimationFrame drain loop. When the queue empties,
- *   the loop stops and notifyPollingStopped() is called.
+ *   Call startPolling() after registering handlers — it runs a
+ *   requestAnimationFrame drain loop that empties the C++ SPSC queue each
+ *   frame and dispatches to onMessage handlers. C++ does NOT wake JS up on
+ *   enqueue: invoking a JS callback from the Godot render thread would be a
+ *   JSI threading violation, so until a CallInvoker-based wake-up is wired,
+ *   messages are only delivered while the polling loop is running.
+ *   (setOnWakeUp is still registered for forward compatibility, but is
+ *   currently never invoked by C++.)
  */
 
 import { NitroModules } from 'react-native-nitro-modules';
@@ -100,9 +103,11 @@ export function createGodotEngine(pckPath: string): GodotEngineWrapper {
       engine.notifyPollingStopped();
     }
   }
-  // ── C++ → JS Wake-Up ──────────────────────────────────────────────────
-  // Register the wake-up callback so C++ can trigger the drain loop
-  // when a message is enqueued and JS isn't currently polling.
+  // ── C++ → JS Wake-Up (forward compatibility only) ─────────────────────
+  // C++ does not currently invoke this callback (doing so from the Godot
+  // render thread would violate JSI threading rules). Registered so the
+  // drain loop starts automatically once a CallInvoker-based wake-up lands.
+  // Until then, consumers MUST call startPolling() to receive messages.
   engine.setOnWakeUp(() => startDrainLoop());
 
   function stopDrainLoop() {

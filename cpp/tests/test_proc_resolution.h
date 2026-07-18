@@ -38,6 +38,10 @@
 
 namespace proc_resolution_test {
 
+// GDExtensionProcs (the cached proc table + resolve()) lives in the module
+// namespace; bring it into scope so this test can construct and verify it.
+using ::margelo::nitro::godot::GDExtensionProcs;
+
 // ── Sentinel pointers ─────────────────────────────────────────────────────
 // We can't call these functions, but we need non-null pointers to verify
 // that resolve() populated them correctly.

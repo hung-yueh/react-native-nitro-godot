@@ -42,10 +42,24 @@ target_include_directories(NitroGodot PRIVATE
 # We declare it as an IMPORTED target so CMake can resolve the link
 # without recompiling.
 #
+# The Android SCons build emits the engine .so per-ABI under:
+#   platform/android/java/lib/libs/<release|debug>/<abi>/libgodot_android.so
+# Use ${ANDROID_ABI} (provided by the NDK toolchain) so each ABI's slice is
+# selected automatically — build the engine for every ABI you ship (the engine
+# build currently produces arm64-v8a only). Override the variant with
+# -DGODOT_ANDROID_BUILD=debug if you compiled a debug engine.
+set(GODOT_ANDROID_BUILD "release" CACHE STRING "Godot Android build variant (release|debug)")
+set(GODOT_ANDROID_SO
+  "${CMAKE_CURRENT_SOURCE_DIR}/../engine_build/godot-src/platform/android/java/lib/libs/${GODOT_ANDROID_BUILD}/${ANDROID_ABI}/libgodot_android.so")
+
+if(NOT EXISTS "${GODOT_ANDROID_SO}")
+  message(WARNING "libgodot_android.so not found for ABI '${ANDROID_ABI}' at:\n  ${GODOT_ANDROID_SO}\n"
+                  "Build the Godot engine for this ABI (bash engine_build/build_godot.sh) before linking.")
+endif()
+
 add_library(libgodot_prebuilt SHARED IMPORTED)
 set_target_properties(libgodot_prebuilt PROPERTIES
-  IMPORTED_LOCATION
-  "${CMAKE_CURRENT_SOURCE_DIR}/../engine_build/godot-src/platform/android/java/lib/libs/release/arm64-v8a/libgodot_android.so"
+  IMPORTED_LOCATION "${GODOT_ANDROID_SO}"
 )
 
 # ── Link everything together ─────────────────────────────────────────────────

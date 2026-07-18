@@ -68,7 +68,7 @@ using FnPFA32Destroy = void(*)(GDExtensionTypePtr);
 // ── Opaque type sizes ───────────────────────────────────────────────────────
 //
 // Godot's opaque types have fixed in-memory sizes that we must match when
-// allocating stack buffers. These were audited against Godot 4.7-dev2 source:
+// allocating stack buffers. These were audited against Godot 4.7-stable source:
 //
 //   String:     CowData<char32_t> → single pointer → 8 bytes (arm64/x86_64)
 //   StringName: single pointer → 8 bytes, padded to 16 for alignment safety
@@ -119,6 +119,12 @@ struct GDExtensionProcs {
   FnPFA32Index   pfa32_index   = nullptr;  ///< packed_float32_array_operator_index_const
   FnPFA32Size    pfa32_size    = nullptr;  ///< packed_float32_array_size
   FnPFA32Destroy pfa32_destroy = nullptr;  ///< packed_float32_array_destroy
+
+  // ── Object liveness (ObjectID revalidation) ───────────────────────────
+  using FnObjGetInstanceId   = GDObjectInstanceID (*)(GDExtensionConstObjectPtr);
+  using FnObjGetInstanceFromId = GDExtensionObjectPtr (*)(GDObjectInstanceID);
+  FnObjGetInstanceId     obj_get_instance_id      = nullptr;  ///< object_get_instance_id
+  FnObjGetInstanceFromId obj_get_instance_from_id = nullptr;  ///< object_get_instance_from_id
 
   /// Resolve all function pointers from a GDExtension get_proc address.
   /// Call once during initialization (before setting live=true).
@@ -194,6 +200,11 @@ struct GDExtensionProcs {
       auto fn = get_proc("packed_float32_array_size");
       pfa32_size = fn ? reinterpret_cast<FnPFA32Size>((void*)fn) : nullptr;
     }
+
+    // ── Object liveness (optional — used to revalidate cached node
+    //    pointers; callers must tolerate null on older builds) ───────────
+    obj_get_instance_id      = reinterpret_cast<FnObjGetInstanceId>((void*)get_proc("object_get_instance_id"));
+    obj_get_instance_from_id = reinterpret_cast<FnObjGetInstanceFromId>((void*)get_proc("object_get_instance_from_id"));
 
     // Critical procs — messaging pipeline won't work without these
     return sn_new && get_singleton && get_var_from_type && var_call && var_destroy;

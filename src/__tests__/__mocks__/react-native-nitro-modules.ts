@@ -15,6 +15,8 @@ export function createMockEngine() {
     initialize: jest.fn(),
     destroy: jest.fn(),
     start: jest.fn(),
+    startEngine: jest.fn(),
+    pause: jest.fn(),
 
     // Message pipeline
     pollMessage: jest.fn(() => {
@@ -28,6 +30,12 @@ export function createMockEngine() {
 
     // Surface
     attachSurface: jest.fn(),
+    detachSurface: jest.fn(),
+    resizeSurface: jest.fn(),
+
+    // Input
+    sendTouchEvent: jest.fn(),
+    sendDragEvent: jest.fn(),
 
     // Lifecycle
     suspendOS: jest.fn(),

@@ -3,7 +3,7 @@
 # 04_ios_symbol_check.sh – Static symbol audit for iOS (host-side)
 # =============================================================================
 # Validates that libgodot.ios.template_release.arm64.a contains the expected
-# engine code. Since Godot 4.4 static libraries on iOS do not have a robust
+# engine code. Since Godot static libraries on iOS do not have a robust
 # C-API exposed yet, we check for presence of core `_godot_` or `_godot_`
 # symbols and ensure the archive size and symbol count represents a full engine.
 # =============================================================================

@@ -10,44 +10,11 @@
  * These tests mock requestAnimationFrame to run synchronously.
  */
 
-import { createGodotEngine } from '../GodotEngine';
-import { createMockEngine } from './__mocks__/react-native-nitro-modules';
-
-// Mock requestAnimationFrame / cancelAnimationFrame for Node.js
-let rafCallbacks: Array<() => void> = [];
-(globalThis as any).requestAnimationFrame = (cb: () => void) => {
-  rafCallbacks.push(cb);
-  return rafCallbacks.length;
-};
-(globalThis as any).cancelAnimationFrame = (_id: number) => {
-  // no-op for tests
-};
-
-/** Flush all pending rAF callbacks (simulates one frame) */
-function flushRAF() {
-  const cbs = [...rafCallbacks];
-  rafCallbacks = [];
-  for (const cb of cbs) cb();
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Create an engine wrapper with a pre-configured mock */
-function createTestEngine() {
-  // Get the mock that NitroModules.createHybridObject will return
-  const mockRaw = createMockEngine();
-
-  // Monkey-patch NitroModules to return our mock
-  const NitroModules = require('react-native-nitro-modules').NitroModules;
-  NitroModules.createHybridObject.mockReturnValueOnce(mockRaw);
-
-  const wrapper = createGodotEngine('/test/game.pck');
-  return { wrapper, mockRaw };
-}
+import { createTestEngine, flushRAF, resetRAF } from './testUtils';
 
 describe('createGodotEngine', () => {
   beforeEach(() => {
-    rafCallbacks = [];
+    resetRAF();
     jest.clearAllMocks();
   });
 
@@ -174,4 +141,116 @@ describe('createGodotEngine', () => {
     expect(received).toEqual([]);
     expect(mockRaw.destroy).toHaveBeenCalled();
   });
+
+  // ── Polling ───────────────────────────────────────────────────────────
+
+  describe('startPolling / stopPolling', () => {
+    test('startPolling keeps the drain loop alive across frames', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      const received: string[] = [];
+      wrapper.onMessage((msg) => received.push(msg));
+
+      wrapper.startPolling();
+
+      // Frame 1: empty queue — loop should continue because polling is true
+      flushRAF();
+
+      // Enqueue between frames
+      mockRaw._enqueueTestMessage('delayed');
+
+      // Frame 2: should pick up the message
+      flushRAF();
+      expect(received).toEqual(['delayed']);
+    });
+
+    test('stopPolling stops the drain loop and notifies C++', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      wrapper.startPolling();
+      flushRAF(); // start the loop
+
+      wrapper.stopPolling();
+      expect(mockRaw.notifyPollingStopped).toHaveBeenCalled();
+    });
+
+    test('stopPolling then startPolling restarts the loop', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      const received: string[] = [];
+      wrapper.onMessage((msg) => received.push(msg));
+
+      wrapper.startPolling();
+      flushRAF();
+      wrapper.stopPolling();
+
+      // Restart
+      wrapper.startPolling();
+      mockRaw._enqueueTestMessage('after-restart');
+      flushRAF();
+
+      expect(received).toEqual(['after-restart']);
+    });
+  });
+
+  // ── unprojectPosition ─────────────────────────────────────────────────
+
+  describe('unprojectPosition', () => {
+    test('returns [x, y] tuple for valid result', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      mockRaw.unprojectPosition.mockReturnValue([100, 200]);
+
+      const result = wrapper.unprojectPosition(1.0, 2.0, 3.0);
+      expect(result).toEqual([100, 200]);
+      expect(mockRaw.unprojectPosition).toHaveBeenCalledWith(1.0, 2.0, 3.0);
+    });
+
+    test('returns undefined when raw returns undefined', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      mockRaw.unprojectPosition.mockReturnValue(undefined as any);
+
+      expect(wrapper.unprojectPosition(1, 2, 3)).toBeUndefined();
+    });
+
+    test('returns undefined when raw returns empty array', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      mockRaw.unprojectPosition.mockReturnValue([]);
+
+      expect(wrapper.unprojectPosition(1, 2, 3)).toBeUndefined();
+    });
+
+    test('returns undefined when raw returns single-element array', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      mockRaw.unprojectPosition.mockReturnValue([100]);
+
+      expect(wrapper.unprojectPosition(1, 2, 3)).toBeUndefined();
+    });
+  });
+
+  // ── OS Lifecycle ──────────────────────────────────────────────────────
+
+  describe('suspendOS / resumeOS', () => {
+    test('suspendOS delegates to raw engine', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      wrapper.suspendOS();
+      expect(mockRaw.suspendOS).toHaveBeenCalled();
+    });
+
+    test('resumeOS delegates to raw engine with surface pointer', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      const ptr = BigInt('0x12345678');
+      wrapper.resumeOS(ptr);
+      expect(mockRaw.resumeOS).toHaveBeenCalledWith(ptr);
+    });
+  });
+
+  // ── Scene Loading ─────────────────────────────────────────────────────
+
+  describe('loadSceneAsync', () => {
+    test('delegates to raw engine', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      wrapper.loadSceneAsync('res://levels/level_2.pck');
+      expect(mockRaw.loadSceneAsync).toHaveBeenCalledWith(
+        'res://levels/level_2.pck'
+      );
+    });
+  });
 });
+

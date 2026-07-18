@@ -1,11 +1,10 @@
 diff --git a/platform/android/display_server_android.cpp b/platform/android/display_server_android.cpp
-index d265ac1..f798bdf 100644
 --- a/platform/android/display_server_android.cpp
 +++ b/platform/android/display_server_android.cpp
-@@ -482,7 +482,11 @@ int64_t DisplayServerAndroid::window_get_native_handle(HandleType p_handle_type,
- 	ERR_FAIL_COND_V(p_window != MAIN_WINDOW_ID, 0);
+@@ -489,7 +489,11 @@
+ 	ERR_FAIL_COND_V(p_window != DisplayServerEnums::MAIN_WINDOW_ID, 0);
  	switch (p_handle_type) {
- 		case WINDOW_HANDLE: {
+ 		case DisplayServerEnums::WINDOW_HANDLE: {
 -			return reinterpret_cast<int64_t>(static_cast<OS_Android *>(OS::get_singleton())->get_godot_java()->get_activity());
 +			GodotJavaWrapper *godot_java = static_cast<OS_Android *>(OS::get_singleton())->get_godot_java();
 +			if (!godot_java) {
@@ -13,31 +12,31 @@ index d265ac1..f798bdf 100644
 +			}
 +			return reinterpret_cast<int64_t>(godot_java->get_activity());
  		}
- 		case WINDOW_VIEW: {
+ 		case DisplayServerEnums::WINDOW_VIEW: {
  			return 0; // Not supported.
-@@ -581,11 +585,19 @@ Size2i DisplayServerAndroid::window_get_size_with_decorations(DisplayServer::Win
+@@ -588,11 +592,19 @@
  }
  
- void DisplayServerAndroid::window_set_mode(DisplayServer::WindowMode p_mode, DisplayServer::WindowID p_window) {
--	OS_Android::get_singleton()->get_godot_java()->enable_immersive_mode(p_mode == WINDOW_MODE_FULLSCREEN || p_mode == WINDOW_MODE_EXCLUSIVE_FULLSCREEN);
+ void DisplayServerAndroid::window_set_mode(DisplayServerEnums::WindowMode p_mode, DisplayServerEnums::WindowID p_window) {
+-	OS_Android::get_singleton()->get_godot_java()->enable_immersive_mode(p_mode == DisplayServerEnums::WINDOW_MODE_FULLSCREEN || p_mode == DisplayServerEnums::WINDOW_MODE_EXCLUSIVE_FULLSCREEN);
 +	GodotJavaWrapper *godot_java = OS_Android::get_singleton()->get_godot_java();
 +	if (!godot_java) {
 +		return;
 +	}
-+	godot_java->enable_immersive_mode(p_mode == WINDOW_MODE_FULLSCREEN || p_mode == WINDOW_MODE_EXCLUSIVE_FULLSCREEN);
++	godot_java->enable_immersive_mode(p_mode == DisplayServerEnums::WINDOW_MODE_FULLSCREEN || p_mode == DisplayServerEnums::WINDOW_MODE_EXCLUSIVE_FULLSCREEN);
  }
  
- DisplayServer::WindowMode DisplayServerAndroid::window_get_mode(DisplayServer::WindowID p_window) const {
+ DisplayServerEnums::WindowMode DisplayServerAndroid::window_get_mode(DisplayServerEnums::WindowID p_window) const {
 -	if (OS_Android::get_singleton()->get_godot_java()->is_in_immersive_mode()) {
 +	GodotJavaWrapper *godot_java = OS_Android::get_singleton()->get_godot_java();
 +	if (!godot_java) {
-+		return WINDOW_MODE_FULLSCREEN;
++		return DisplayServerEnums::WINDOW_MODE_FULLSCREEN;
 +	}
 +	if (godot_java->is_in_immersive_mode()) {
- 		return WINDOW_MODE_FULLSCREEN;
+ 		return DisplayServerEnums::WINDOW_MODE_FULLSCREEN;
  	} else {
- 		return WINDOW_MODE_MAXIMIZED;
-@@ -863,7 +875,13 @@ void DisplayServerAndroid::_mouse_update_mode() {
+ 		return DisplayServerEnums::WINDOW_MODE_MAXIMIZED;
+@@ -870,23 +882,29 @@
  			? mouse_mode_override
  			: mouse_mode_base;
  
@@ -45,24 +44,24 @@ index d265ac1..f798bdf 100644
 +	GodotJavaWrapper *godot_java = OS_Android::get_singleton()->get_godot_java();
 +	if (!godot_java) {
 +		mouse_mode = wanted_mouse_mode;
-+		return;
-+	}
-+	GodotJavaViewWrapper *godot_view = godot_java->get_godot_view();
-+	if (!godot_view || !godot_view->can_update_pointer_icon() || !godot_view->can_capture_pointer()) {
  		return;
  	}
++	GodotJavaViewWrapper *godot_view = godot_java->get_godot_view();
++	if (!godot_view || !godot_view->can_update_pointer_icon() || !godot_view->can_capture_pointer()) {
++		return;
++	}
  	if (mouse_mode == wanted_mouse_mode) {
-@@ -871,15 +889,15 @@ void DisplayServerAndroid::_mouse_update_mode() {
+ 		return;
  	}
  
- 	if (wanted_mouse_mode == MouseMode::MOUSE_MODE_HIDDEN) {
+ 	if (wanted_mouse_mode == DisplayServerEnums::MouseMode::MOUSE_MODE_HIDDEN) {
 -		OS_Android::get_singleton()->get_godot_java()->get_godot_view()->set_pointer_icon(CURSOR_TYPE_NULL);
 +		godot_view->set_pointer_icon(CURSOR_TYPE_NULL);
  	} else {
  		cursor_set_shape(cursor_shape);
  	}
  
- 	if (wanted_mouse_mode == MouseMode::MOUSE_MODE_CAPTURED) {
+ 	if (wanted_mouse_mode == DisplayServerEnums::MouseMode::MOUSE_MODE_CAPTURED) {
 -		OS_Android::get_singleton()->get_godot_java()->get_godot_view()->request_pointer_capture();
 +		godot_view->request_pointer_capture();
  	} else {
@@ -71,10 +70,10 @@ index d265ac1..f798bdf 100644
  	}
  
  	mouse_mode = wanted_mouse_mode;
-@@ -929,7 +947,10 @@ BitField<MouseButtonMask> DisplayServerAndroid::mouse_get_button_state() const {
+@@ -936,7 +954,10 @@
  }
  
- void DisplayServerAndroid::_cursor_set_shape_helper(CursorShape p_shape, bool force) {
+ void DisplayServerAndroid::_cursor_set_shape_helper(DisplayServerEnums::CursorShape p_shape, bool force) {
 -	if (!OS_Android::get_singleton()->get_godot_java()->get_godot_view()->can_update_pointer_icon()) {
 +	GodotJavaWrapper *godot_java = OS_Android::get_singleton()->get_godot_java();
 +	GodotJavaViewWrapper *godot_view = godot_java ? godot_java->get_godot_view() : nullptr;
@@ -83,19 +82,19 @@ index d265ac1..f798bdf 100644
  		return;
  	}
  	if (cursor_shape == p_shape && !force) {
-@@ -939,7 +960,7 @@ void DisplayServerAndroid::_cursor_set_shape_helper(CursorShape p_shape, bool fo
+@@ -946,7 +967,7 @@
  	cursor_shape = p_shape;
  
- 	if (mouse_mode == MouseMode::MOUSE_MODE_VISIBLE || mouse_mode == MouseMode::MOUSE_MODE_CONFINED) {
+ 	if (mouse_mode == DisplayServerEnums::MouseMode::MOUSE_MODE_VISIBLE || mouse_mode == DisplayServerEnums::MouseMode::MOUSE_MODE_CONFINED) {
 -		OS_Android::get_singleton()->get_godot_java()->get_godot_view()->set_pointer_icon(android_cursors[cursor_shape]);
 +		godot_view->set_pointer_icon(android_cursors[cursor_shape]);
  	}
  }
  
-@@ -954,11 +975,15 @@ DisplayServer::CursorShape DisplayServerAndroid::cursor_get_shape() const {
+@@ -961,11 +982,15 @@
  
- void DisplayServerAndroid::cursor_set_custom_image(const Ref<Resource> &p_cursor, CursorShape p_shape, const Vector2 &p_hotspot) {
- 	ERR_FAIL_INDEX(p_shape, CURSOR_MAX);
+ void DisplayServerAndroid::cursor_set_custom_image(const Ref<Resource> &p_cursor, DisplayServerEnums::CursorShape p_shape, const Vector2 &p_hotspot) {
+ 	ERR_FAIL_INDEX(p_shape, DisplayServerEnums::CURSOR_MAX);
 -	String cursor_path = p_cursor.is_valid() ? p_cursor->get_path() : "";
 -	if (!cursor_path.is_empty()) {
 -		cursor_path = ProjectSettings::get_singleton()->globalize_path(cursor_path);

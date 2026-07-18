@@ -9,7 +9,11 @@ import {
 // ── Native event payload types ─────────────────────────────────────────────
 
 export interface SurfaceCreatedEvent {
-  /** Hex-encoded native surface pointer, e.g. "0x7f3c00a8b000" */
+  /**
+   * Native surface pointer as a numeric string. Android emits an unsigned
+   * decimal value (`Long.toULong().toString()`); iOS emits hex (`"0x…"`).
+   * Parse with `BigInt()`, which accepts both forms.
+   */
   pointer: string;
 }
 

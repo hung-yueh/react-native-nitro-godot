@@ -6,7 +6,7 @@
 #   bash engine_build/build_godot.sh
 #
 # Environment variables (all optional):
-#   GODOT_VERSION      – Godot tag to build (default: 4.4-stable)
+#   GODOT_VERSION      – Godot tag to build (default: read from GODOT_VERSION file)
 #   ANDROID_NDK_ROOT   – Path to Android NDK (also checks ANDROID_NDK_HOME)
 #   GODOT_DRY_RUN      – Set to "1" to skip actual scons invocations (CI/test)
 #   CCACHE_DIR         – Passed through to ccache if set
@@ -55,6 +55,16 @@ fi
 # If GODOT_COMMIT was set via the file, use it; otherwise allow env override.
 GODOT_COMMIT="${GODOT_COMMIT:-}"
 DRY_RUN="${GODOT_DRY_RUN:-0}"
+
+# Derive the version status (e.g. "rc2" from "4.7-rc2") so the compiled engine
+# self-identifies correctly. We build from a commit hash, not a tagged checkout,
+# so the in-tree version.py status is generic (e.g. "rc") and would not match the
+# "rc2" that the matching editor exported the PCK with. Godot reads
+# GODOT_VERSION_STATUS at build time (see methods.py) and overrides version.py.
+# Respect an explicit env override; skip for branch builds like "master".
+if [[ -z "${GODOT_VERSION_STATUS:-}" && "$GODOT_VERSION" == *-* ]]; then
+    export GODOT_VERSION_STATUS="${GODOT_VERSION#*-}"
+fi
 # Resolve the directory containing this script so the script is safe to call
 # from any working directory.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,7 +84,7 @@ else
     NCPU=4
 fi
 
-# Android NDK — Godot 4.4 requires ANDROID_HOME (SDK root) and derives the NDK
+# Android NDK — Godot requires ANDROID_HOME (SDK root) and derives the NDK
 # path internally as $ANDROID_HOME/ndk/23.2.8568313. We auto-detect the SDK root
 # from the NDK path so users only need to set one variable.
 NDK_ROOT="${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
@@ -91,6 +101,7 @@ echo ""
 echo "============================================================"
 echo "  Godot Engine Build Automation"
 echo "  Version : $GODOT_VERSION"
+echo "  Status  : ${GODOT_VERSION_STATUS:-<in-tree default>}"
 echo "  Cores   : $NCPU"
 echo "  DryRun  : $DRY_RUN"
 echo "============================================================"
@@ -141,7 +152,7 @@ fi
 if [[ -z "$(ls -A "$SRC_DIR" 2>/dev/null)" ]]; then
     log_step "Extracting tarball into $SRC_DIR …"
     # GitHub tarballs wrap everything in a top-level directory like
-    # godot-4.4-stable/ — strip that leading directory component.
+    # godot-<version>/ — strip that leading directory component.
     tar -xf "$TARBALL_FILE" \
         --strip-components=1 \
         -C "$SRC_DIR" \
@@ -277,7 +288,7 @@ fi
 log_ok "Using Android NDK: $NDK_ROOT"
 
 # ── NDK Compatibility Shim ────────────────────────────────────────────────────
-# Godot 4.4's platform/android/SCsub hardcodes the pre-r24 NDK path:
+# Godot's platform/android/SCsub hardcodes the pre-r24 NDK path:
 #   $NDK_ROOT/sources/cxx-stl/llvm-libc++/libs/<abi>/libc++_shared.so
 # NDK r24+ moved this file to the toolchain sysroot. We create the legacy
 # directory structure as symlinks so Godot's SCsub finds what it expects.
@@ -330,7 +341,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
     dd if=/dev/urandom bs=1k count=128 2>/dev/null > "$ANDROID_SO_SRC"
     log_warn "DRY_RUN: created stub $ANDROID_SO_SRC"
 else
-    # Godot 4.4 may move the .so from bin/ into the Java library directory:
+    # Godot may move the .so from bin/ into the Java library directory:
     #   platform/android/java/lib/libs/release/arm64-v8a/libgodot_android.so
     # Check both locations.
     ANDROID_SO_SRC=$(find "$SRC_DIR/bin" \
@@ -405,7 +416,7 @@ else
         library_type=shared_library \
         use_ccache=yes
 
-    # Godot 4.4 produces static .a archives for iOS.
+    # Godot produces static .a archives for iOS.
     # On iOS, library_type=shared_library still outputs .a (Apple doesn't support
     # standalone shared libs for App Store distribution). Locate the .a files.
     if [[ "$DRY_RUN" == "1" ]]; then
@@ -505,7 +516,7 @@ if [[ -f "$SO_PATH" ]]; then
 
     echo "       libgodot.so size: ${SO_MB} MB"
 
-    # Godot 4.4 with optimize=size + lto=full typically produces a ~50-60 MB
+    # Godot with optimize=size + lto=full typically produces a ~50-60 MB
     # stripped .so (the 25 MB goal requires further module exclusions beyond what
     # custom.py provides today). Gate: warn >60 MB, abort >80 MB.
     if awk "BEGIN { exit ($SO_BYTES < 60*1024*1024) ? 0 : 1 }"; then

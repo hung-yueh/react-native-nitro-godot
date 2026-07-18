@@ -1,0 +1,16 @@
+# 01 — Smoke: app launches past PCK extraction into the game shell.
+appId: net.libgodot.nitroswarm
+---
+- launchApp:
+    clearState: false
+# Splash may flash "Extracting game data…" briefly; wait for the shell.
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- assertVisible: "Stats"
+- assertVisible: "Settings"
+# Dev builds show the engine state in the debug footer — the engine must be
+# running, not stuck in initializing/error.
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 30000

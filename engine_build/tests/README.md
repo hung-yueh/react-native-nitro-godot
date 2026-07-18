@@ -4,7 +4,7 @@ This directory contains standalone verification tools for the outputs produced b
 
 ## 1. Automated Host Tests (No device required)
 
-These tests validate binary structure, architecture, and symbol exports against Godot 4.4 baselines.
+These tests validate binary structure, architecture, and symbol exports for the current Godot build.
 
 **Run everything:**
 
@@ -46,4 +46,4 @@ _(Visual test scaffolding pending React Native integration bridge architecture).
 ---
 
 **Note on V4 / `libgodot_create_godot_instance`**:
-Godot 4.4-stable relies on the JNI surface (`Java_org_godotengine_*`) or specific `GodotAppMain` delegates for lifecycle. The C-friendly `libgodot_create_godot_instance` embedding API is slated for Godot 4.5.
+Godot's LibGodot C-API (shipped in 4.6+) provides `libgodot_create_godot_instance` for embedding Godot as a library.

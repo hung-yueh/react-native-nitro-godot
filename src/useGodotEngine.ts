@@ -45,13 +45,24 @@ export interface UseGodotEngineResult {
   pause: () => void;
   /** Send a string message to the running Godot scene */
   sendMessage: (msg: string) => void;
-  /** Forward a touch press/release event to Godot's Input system */
+  /**
+   * Forward a touch press/release to Godot's Input system. Coordinates are in
+   * React Native **logical (dp)** units — they are multiplied by
+   * `PixelRatio.get()` to match Godot's physical-pixel viewport. (This differs
+   * from `handleTouchEvent`, which receives native events already in physical
+   * pixels and forwards them unscaled.)
+   */
   sendTouchEvent: (x: number, y: number, pressed: boolean, index: number) => void;
-  /** Forward a touch drag event to Godot's Input system */
+  /**
+   * Forward a touch drag to Godot's Input system. Coordinates and deltas are in
+   * React Native **logical (dp)** units and are scaled by `PixelRatio.get()`.
+   */
   sendDragEvent: (x: number, y: number, relativeX: number, relativeY: number, velocityX: number, velocityY: number, index: number) => void;
   /**
    * Convenience handler for <GodotView onTouchEvent={handleTouchEvent} />.
-   * Automatically translates native touch events to sendTouchEvent/sendDragEvent calls.
+   * Automatically translates native touch events to the raw engine
+   * sendTouchEvent/sendDragEvent calls. Native events are already in **physical
+   * pixels**, so they are forwarded unscaled (no PixelRatio applied).
    * Also tracks active pointers for ghost-touch release on background.
    */
   handleTouchEvent: (event: NativeSyntheticEvent<TouchEvent>) => void;
@@ -194,11 +205,14 @@ export function useGodotEngine(
     engine.raw.attachSurface(ptr);
 
     // If this is the initial mount, start the engine.
-    // If this is a hot-swap (surface recreated after background), resume.
+    // If this is a hot-swap (surface recreated after background OR after the
+    // view was unmounted/remounted while the engine kept running), resume —
+    // resumeOS() is the designated path for handing a fresh surface to a live
+    // engine; attachSurface() alone is only consumed by the initial start().
     if (engineState === 'initializing' || engineState === 'idle') {
       engine.raw.start();
       setEngineState('running');
-    } else if (engineState === 'suspended') {
+    } else if (engineState === 'suspended' || engineState === 'running') {
       engine.raw.resumeOS(ptr);
       setEngineState('running');
     }

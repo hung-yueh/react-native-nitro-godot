@@ -1,0 +1,31 @@
+# 03 — Settings CQRS dispatch: controls update the UI and dispatch intents to
+# the running engine (regression: settings used to receive a null engine and
+# silently drop every intent).
+appId: net.libgodot.nitroswarm
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 30000
+
+- tapOn: "Settings"
+- assertVisible: "80%"
+
+# Volume stepper: 80 → 85 → 90
+- tapOn: "+"
+- assertVisible: "85%"
+- tapOn: "+"
+- assertVisible: "90%"
+
+# Difficulty segmented control
+- tapOn: "Hard"
+
+# Back to the game — engine still running after dispatching intents
+- tapOn: "Play"
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 10000
+
+# Settings state persists across the tab round-trip (screen stays mounted)
+- tapOn: "Settings"
+- assertVisible: "90%"

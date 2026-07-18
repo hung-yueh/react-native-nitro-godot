@@ -22,7 +22,7 @@
  */
 
 import React from "react";
-import { View, Text, StyleSheet, PixelRatio } from "react-native";
+import { View, Text, StyleSheet, PixelRatio, Platform, StatusBar } from "react-native";
 // @ts-ignore — react-native-gesture-handler is a peer dependency (consumer app must install)
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { Memo } from "@legendapp/state/react";
@@ -34,6 +34,13 @@ import type { GodotEngineWrapper } from "../GodotEngine";
 const JOYSTICK_SIZE = 140;
 const JOYSTICK_MARGIN = 30;
 const SENSITIVITY = 1.0; // Tunable multiplier for raw translation → Godot coords
+
+// Approx. safe-area insets so the overlay HUD clears the status bar / Dynamic
+// Island (top) and the home indicator (bottom). For exact per-device values,
+// the consumer app can wrap in react-native-safe-area-context; this keeps the
+// component dependency-free.
+const TOP_INSET = Platform.select({ ios: 59, android: StatusBar.currentHeight ?? 24, default: 24 })!;
+const BOTTOM_INSET = Platform.select({ ios: 34, android: 0, default: 0 })!;
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -110,7 +117,7 @@ export function NitroSwarmHUD({ engine }: NitroSwarmHUDProps) {
   return (
     <View style={styles.container} pointerEvents="box-none">
       {/* ── Score / Combo HUD (Zero-Render via Legend-State <Memo>) ───────── */}
-      <View style={styles.scoreBar}>
+      <View style={[styles.scoreBar, { top: TOP_INSET + 4 }]}>
         <Text style={styles.scoreLabel}>
           SCORE: <Memo>{() => String(state$.game.score.get())}</Memo>
         </Text>
@@ -123,7 +130,7 @@ export function NitroSwarmHUD({ engine }: NitroSwarmHUDProps) {
       </View>
 
       {/* ── Enemy Counter ─────────────────────────────────────────────────── */}
-      <View style={styles.enemyCounter}>
+      <View style={[styles.enemyCounter, { top: TOP_INSET + 40 }]}>
         <Text style={styles.enemyText}>
           🎯 <Memo>{() => String(state$.game.enemyCount.get())}</Memo>
         </Text>
@@ -131,7 +138,7 @@ export function NitroSwarmHUD({ engine }: NitroSwarmHUDProps) {
 
       {/* ── Move Joystick (Bottom-Left) ───────────────────────────────────── */}
       <GestureDetector gesture={moveGesture}>
-        <View style={[styles.joystickZone, styles.moveZone]}>
+        <View style={[styles.joystickZone, styles.moveZone, { bottom: JOYSTICK_MARGIN + BOTTOM_INSET }]}>
           <View style={styles.joystickRing}>
             <Text style={styles.joystickLabel}>MOVE</Text>
           </View>
@@ -140,7 +147,7 @@ export function NitroSwarmHUD({ engine }: NitroSwarmHUDProps) {
 
       {/* ── Aim Joystick (Bottom-Right) ───────────────────────────────────── */}
       <GestureDetector gesture={aimGesture}>
-        <View style={[styles.joystickZone, styles.aimZone]}>
+        <View style={[styles.joystickZone, styles.aimZone, { bottom: JOYSTICK_MARGIN + BOTTOM_INSET }]}>
           <View style={styles.joystickRing}>
             <Text style={styles.joystickLabel}>AIM</Text>
           </View>
@@ -148,7 +155,7 @@ export function NitroSwarmHUD({ engine }: NitroSwarmHUDProps) {
       </GestureDetector>
 
       {/* ── Player Health (from existing HealthBar or inline) ─────────────── */}
-      <View style={styles.healthBar}>
+      <View style={[styles.healthBar, { bottom: JOYSTICK_MARGIN + 10 + BOTTOM_INSET }]}>
         <Text style={styles.healthLabel}>
           ❤️ <Memo>{() => String(state$.player.health.get())}</Memo>
         </Text>

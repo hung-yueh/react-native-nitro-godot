@@ -1,0 +1,24 @@
+# 04 — OS lifecycle: backgrounding and foregrounding the app must suspend and
+# resume the engine without leaving it black/frozen/error.
+appId: net.libgodot.nitroswarm
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 30000
+
+# Background → foreground round-trip (suspendOS/resumeOS path)
+- pressKey: home
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 15000
+
+# The shell is fully interactive after resume
+- tapOn: "Stats"
+- assertVisible: "LIVE STATS"
+- tapOn: "Play"
+- extendedWaitUntil:
+    visible: "engine: running"
+    timeout: 10000

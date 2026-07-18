@@ -243,6 +243,19 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
    */
   void _setLastError(const std::string& layer, const std::string& msg);
 
+  /**
+   * Resolve the `/root/RNBridge` AutoLoad node and write it into `out_bridge`
+   * as an OBJECT Variant ready for variant_call. RNBridge is an AutoLoad, so
+   * its node pointer is stable for the engine's lifetime — the expensive
+   * navigation chain (Engine → get_main_loop → get_root → get_node) runs only
+   * ONCE and the raw pointer is cached in _rnbridge_obj_. Subsequent calls just
+   * re-wrap the cached pointer (cheap), eliminating ~4 StringName allocations
+   * and ~3 variant_calls per call, per frame callback. Returns false if the
+   * node isn't available yet (caller skips this frame and retries).
+   * Godot-thread-only; no synchronisation required.
+   */
+  bool _getBridgeVariant(const GDExtensionProcs& P, VSlot& out_bridge);
+
  public:
   // ── Godot-thread frame callback entry points ─────────────────────────────
   // Called from _godot_frame_callback() which is registered via
@@ -313,6 +326,19 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
   /// Lifetime: created in initialize(), cleared in destroy().
   std::shared_ptr<GodotExtensionState> gdext_state_;
 
+  /// Cached pointer to the `/root/RNBridge` AutoLoad node. Resolved lazily on
+  /// the Godot thread by _getBridgeVariant() and reused for the engine's
+  /// lifetime (AutoLoads survive scene changes). Godot-thread-only; reset in
+  /// destroy(). nullptr until first successful resolve.
+  GDExtensionObjectPtr _rnbridge_obj_ = nullptr;
+
+  /// ObjectID of the cached RNBridge node, captured at cache time. Used by
+  /// _getBridgeVariant() to revalidate _rnbridge_obj_ each call via
+  /// object_get_instance_from_id — Godot's idiom for detecting a freed node —
+  /// so consumer GDScript freeing/replacing the AutoLoad cannot cause a
+  /// use-after-free. 0 when no id is cached (or the procs are unavailable).
+  GDObjectInstanceID _rnbridge_id_ = 0;
+
   /// Pending OS surface pointer — stashed by attachSurface(), read by start().
   /// Android: ANativeWindow*   iOS: CAMetalLayer*
   std::atomic<void*> pending_surface_{nullptr};
@@ -354,12 +380,26 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
   /// Pre-allocated with 256 slots to avoid allocations during gameplay.
   moodycamel::ReaderWriterQueue<std::string> _message_queue{256};
 
-  /// Wake-up flag: true when JS is actively in a rAF drain loop.
+  /// Thread id of the single SPSC producer (the render/Godot thread). Set when
+  /// the render thread starts; reset to the default id by _stopAndJoinThread()
+  /// after the join. _setLastError() consults this: it enqueues into
+  /// _message_queue only from the producer thread itself, OR when the id is
+  /// default (no render thread alive — this thread is momentarily the sole
+  /// producer, so the strict single-producer invariant holds either way).
+  /// std::thread::id is trivially copyable, so this is a valid std::atomic
+  /// specialisation.
+  std::atomic<std::thread::id> producer_thread_id_{};
+
+  /// Polling flag: true when JS is (believed to be) in a rAF drain loop.
   /// Reset by notifyPollingStopped(), set by enqueueMessageFromGodot().
+  /// Currently write-only bookkeeping — kept for the future CallInvoker-based
+  /// wake-up protocol.
   std::atomic<bool> _is_js_polling{false};
 
   /// JS callback to trigger the rAF drain loop. Set via setOnWakeUp().
-  /// Called by enqueueMessageFromGodot() when _is_js_polling was false.
+  /// NOT currently invoked from C++: calling a JS function from the Godot
+  /// render thread would violate JSI threading rules. Wire through Nitro's
+  /// CallInvoker before invoking. Until then JS must call startPolling().
   std::function<void()> _onWakeUp;
 
   // ── Epic 4: Camera Matrix Double-Buffer ───────────────────────────────

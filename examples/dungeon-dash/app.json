@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Dungeon Dash",
-    "slug": "dungeon-dash",
+    "name": "NitroSwarm",
+    "slug": "nitroswarm",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "net.libgodot.dungeondash",
-      "appleTeamId": "ERN2P55L6C"
+      "bundleIdentifier": "net.libgodot.nitroswarm",
+      "appleTeamId": "YOUR_APPLE_TEAM_ID"
     },
     "android": {
-      "package": "net.libgodot.dungeondash"
+      "package": "net.libgodot.nitroswarm"
     }
   }
 }

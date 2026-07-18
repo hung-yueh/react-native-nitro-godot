@@ -101,6 +101,11 @@ Pod::Spec.new do |s|
     # libgodot is pure C/C++ (no ObjC categories) so -ObjC is unnecessary.
     # Suppress Godot's @deprecated comment warnings (gdextension_interface.gen.h)
     "WARNING_CFLAGS" => "-Wno-documentation-deprecated-sync",
+    # Disable the auto-generated ObjC header for Swift — static linkage on
+    # Xcode 26.4 breaks with it. Lives here (not in the nitrogen-generated
+    # autolinking script, which merges this hash) so `npx nitrogen` can't
+    # silently drop it on regeneration.
+    "SWIFT_INSTALL_OBJC_HEADER" => "NO",
   }
 
   # ── Nitrogen auto-linking: adds generated/shared and generated/ios sources,
