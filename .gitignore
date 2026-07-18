@@ -73,6 +73,7 @@ Thumbs.db
 # ========================
 .env
 .env.*
+.npmrc
 *.local
 *.pem
 *.p8
