@@ -40,10 +40,10 @@ A high-performance React Native module that embeds the [Godot Engine](https://go
 │       └── LOAD_PROGRESS → loading state updates         │
 │                                                          │
 │   <GodotView />               ← native surface component │
-│       ├── onSurfaceCreated    ← emits pointer string     │
-│       ├── onTouchEvent        ← forwards touch streams   │
-│       ├── onAppBackground     ← ghost touch release      │
-│       └── onAppForeground     ← resume callback          │
+│       ├── onSurfaceCreated    ← emits pointer (bigint)   │
+│       ├── onSurfaceChanged    ← viewport resize          │
+│       ├── onSurfaceDestroyed  ← cleanup callback         │
+│       └── onTouchEvent        ← forwards touch streams   │
 ├──────────────────────────────────────────────────────────┤
 │  Nitro Modules (JSI / C++)    100% THREAD ISOLATION      │
 │                                                          │
@@ -81,7 +81,7 @@ All cross-thread data flows through lock-free SPSC queues or atomic double-buffe
 | Dependency    | Version           |
 | ------------- | ----------------- |
 | React Native  | >= 0.73           |
-| Expo          | >= 55 (SDK 55)    |
+| Expo          | >= 55 (optional)  |
 | Nitro Modules | >= 0.35.0         |
 | Godot Engine  | 4.7-stable (pinned) |
 | Android NDK   | >= 27             |
@@ -126,10 +126,17 @@ import { StyleSheet, View, Text } from "react-native";
 import { useGodotEngine, GodotView } from "react-native-nitro-godot";
 
 function GameScreen() {
-  const { engineState, lastError, surfaceCallbacks, handleTouchEvent } =
-    useGodotEngine(`${FileSystem.documentDirectory}game.pck`, (msg) =>
-      console.log("Godot says:", msg),
-    );
+  const {
+    engine,
+    engineState,
+    lastError,
+    surfaceCallbacks,
+    handleTouchEvent,
+    sendMessage,
+    pause,
+  } = useGodotEngine(`${FileSystem.documentDirectory}game.pck`, (msg) =>
+    console.log("Godot says:", msg),
+  );
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -148,16 +155,26 @@ function GameScreen() {
 
 ### `createGodotEngine(pckPath)` — Lower-Level Wrapper
 
-For non-React contexts or manual control:
+For non-React contexts or manual control. Returns a `GodotEngineWrapper` with event-driven messaging:
 
 ```ts
 import { createGodotEngine } from "react-native-nitro-godot";
 
 const engine = createGodotEngine("/path/to/game.pck");
-engine.onMessage((msg) => console.log("Godot→JS:", msg));
-engine.startPolling(); // rAF drain loop
+
+// Subscribe to messages from Godot (returns an unsubscribe function)
+const unsubscribe = engine.onMessage((msg) => console.log("Godot→JS:", msg));
+
+engine.startPolling(); // Start the rAF drain loop
 engine.sendMessage(JSON.stringify({ action: "START_GAME" }));
-// Later: engine.destroy();
+
+// Access the raw HybridObject for direct JSI calls
+engine.raw.attachSurface(surfacePointer);
+engine.raw.start();
+
+// Clean up
+engine.stopPolling();
+engine.destroy();
 ```
 
 ### Core HybridObject Methods (`GodotEngine`)
@@ -168,17 +185,19 @@ For advanced manual lifecycle control:
 | --------------------------------- | ------------------------------------------------------------------------------------------ |
 | `initialize(pckPath: string)`     | Load a `.pck` file (Must be an extracted, absolute file system path).                      |
 | `start()`                         | Spawn the render thread; begins the Godot main loop at ~60 Hz.                             |
-| `attachSurface(ptr: UInt64)`      | Bind a native OS surface pointer (ANativeWindow* / CAMetalLayer*).                         |
+| `pause()`                         | Pauses the Godot main loop without destroying the engine state.                            |
+| `attachSurface(ptr: bigint)`      | Bind a native OS surface pointer (ANativeWindow\* / CAMetalLayer\*).                       |
 | `updateSharedBuffer(buf)`         | Push a native ArrayBuffer for true zero-copy memory sharing.                               |
 | `sendMessage(msg: string)`        | Enqueues a string into the inbound SPSC queue. Dispatched to GDScript on the Godot thread. |
 | `pollMessage(): string`           | Pop from the outbound SPSC lock-free queue. Returns `""` if empty. Safe at 120Hz.          |
 | `notifyPollingStopped()`          | Resets the wake-up flag after draining. Called automatically by the wrapper.               |
+| `setOnWakeUp(callback)`           | Registers a JS callback invoked when Godot enqueues a message and JS is not polling.       |
 | `suspendOS()`                     | Pause engine on app background. Prevents GPU timeout crashes.                              |
-| `resumeOS(ptr: UInt64)`           | Resume engine on foreground. Reattaches the native surface.                                |
+| `resumeOS(ptr: bigint)`           | Resume engine on foreground. Reattaches the native surface.                                |
 | `loadSceneAsync(pckPath: string)` | Kick off async scene loading with progress events via SPSC queue.                          |
 | `unprojectPosition(x, y, z)`      | Pure-math 3D→2D projection using cached camera matrices. Thread-safe.                      |
-| `sendTouchEvent(x, y, ...)`       | Enqueues a `TouchEvent` struct. Dispatched as `InputEventScreenTouch` on Godot thread.     |
-| `sendDragEvent(x, y, ...)`        | Enqueues a `DragEvent` struct. Dispatched as `InputEventScreenDrag` on Godot thread.       |
+| `sendTouchEvent(x, y, pressed, index)` | Forward a touch press/release to Godot's `InputEventScreenTouch`.                     |
+| `sendDragEvent(x, y, relX, relY, velX, velY, index)` | Forward a touch drag to Godot's `InputEventScreenDrag`.             |
 | `resizeSurface(w, h)`             | Updates Godot viewport + swapchain to match native surface dimensions.                     |
 | `getLastError(): string`          | Returns last critical engine error, or `""`. Check when Godot view is blank.               |
 | `destroy()`                       | Stop thread and call `libgodot_destroy_godot_instance()`.                                  |
@@ -345,11 +364,15 @@ npm test
 
 ### TypeScript Tests (Jest)
 
-| Test File                    | Coverage                                                                                              |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `godotState.test.ts`         | `ingestStateSync` merging, damage sequences, enemy map, edge cases                                    |
-| `GodotEngine.test.ts`        | Message handler subscribe/unsubscribe, multi-handler dispatch, error resilience, drain loop lifecycle |
-| `dispatchGameIntent.test.ts` | Intent serialization, payload preservation                                                            |
+| Test File                        | Coverage                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `godotState.test.ts`             | `ingestStateSync` merging, damage sequences, enemy map, edge cases                                    |
+| `GodotEngine.test.ts`            | Message handler subscribe/unsubscribe, multi-handler dispatch, error resilience, drain loop lifecycle |
+| `dispatchGameIntent.test.ts`     | Intent serialization, payload preservation                                                            |
+| `useGodotEngine.test.ts`         | Hook lifecycle, surface callbacks, AppState suspend/resume, touch forwarding                          |
+| `useGodotEngine.hook.test.tsx`   | React integration tests with `renderHook`, state transitions                                         |
+| `GodotView.test.tsx`             | Native view component rendering and prop forwarding                                                   |
+| `unproject3DToScreen.test.ts`    | 3D→2D projection math, camera matrix edge cases                                                      |
 
 ### C++ Compile-Time Test
 
@@ -438,6 +461,14 @@ C++ LOGE() → _setLastError(layer, msg)
         └── useGodotEngine → setLastError(msg), setEngineState('error')
               └── console.error(msg)
 ```
+
+## 📚 Additional Documentation
+
+- [Architecture Deep-Dive](ARCHITECTURE.md) — detailed design document covering threading model, SPSC queue internals, and GDExtension integration
+- [RNBridge Setup Guide](RNBRIDGE_SETUP.md) — step-by-step instructions for setting up the GDScript `RNBridge` autoload
+- [Engine Build Guide](engine_build/README.md) — compiling Godot as a library from source
+- [Patch Management](engine_build/patches/README.md) — managing version-pinned patches for custom engine builds
+- [Third-Party Licenses](THIRD_PARTY_LICENSES.md) — license attributions for vendored dependencies
 
 ## License
 
