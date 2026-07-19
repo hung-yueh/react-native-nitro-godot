@@ -462,6 +462,48 @@ C++ LOGE() → _setLastError(layer, msg)
               └── console.error(msg)
 ```
 
+## 📊 Measuring Real (Presented) FPS
+
+**Do not trust an in-engine fps counter to tell you what the user sees.** Godot's
+`Engine.get_frames_per_second()` (and any JS/RN fps readout) measures the
+**render / iteration rate** — how often the Godot main loop runs. That is not the
+**present rate** — how many frames CoreAnimation actually commits to the display.
+
+They can diverge sharply. The render loop drives `iteration()` from a background
+thread that `dispatch_sync`s onto the main thread. If a frame takes at least a
+full frame budget to render+present, the loop stops yielding, the main run loop
+can't cycle, and CADisplayLink can't commit the rendered frame — so most rendered
+frames never reach the screen. This is most visible on the **iOS Simulator**,
+whose software-emulated GL present is slow: we have observed the counter reading
+**~40fps while only ~9fps was actually presented**. (The render loop guarantees a
+minimum per-frame main-thread yield to keep CoreAnimation fed — see the frame
+pacing in `cpp/HybridGodotEngine.cpp` — but slow environments can still present
+below the iteration rate, so always measure the real thing.)
+
+### Measure it
+
+[`scripts/measure-present-fps.sh`](scripts/measure-present-fps.sh) reports the
+true on-screen present rate by recording the composited screen and analyzing the
+frame timestamps (`simctl recordVideo` is variable-frame-rate — it encodes a
+frame only when the screen changes, so the gaps between frame PTS are the real
+present intervals):
+
+```bash
+# Record the simulator for 12s while you interact with the app, then print the
+# real presented-frame rate distribution (median/p90 interval + implied fps):
+scripts/measure-present-fps.sh <simulator-udid> 12
+
+# Or analyze a recording you already have, optionally within a time window:
+scripts/measure-present-fps.sh --analyze gameplay.mp4 10.5 15
+```
+
+For a reading that's independent of whether your scene is animating, add a node
+that changes every frame (rotate/translate a sprite in `_process`) so every
+presented frame differs — then the script measures the pure present rate.
+
+On a **real device**, use Xcode **Instruments → Core Animation FPS** or **Metal
+System Trace** for hardware-accurate presented-frame timing.
+
 ## 📚 Additional Documentation
 
 - [Architecture Deep-Dive](ARCHITECTURE.md) — detailed design document covering threading model, SPSC queue internals, and GDExtension integration
