@@ -48,7 +48,7 @@ Pod::Spec.new do |s|
     :name => "Copy libgodot for current platform",
     :execution_position => :before_compile,
     :script => <<~SCRIPT
-      GODOT_XCFW="${PODS_TARGET_SRCROOT}/engine_build/output/ios/libgodot.xcframework"
+      GODOT_XCFW="${PODS_TARGET_SRCROOT}/prebuilt/ios/libgodot.xcframework"
       if [ "${PLATFORM_NAME}" = "iphonesimulator" ]; then
         SLICE_DIR="${GODOT_XCFW}/ios-arm64-simulator"
       else
@@ -92,8 +92,7 @@ Pod::Spec.new do |s|
 
   s.pod_target_xcconfig = {
     "HEADER_SEARCH_PATHS" => [
-      "$(PODS_TARGET_SRCROOT)/engine_build/godot-src/core/extension",
-      "$(PODS_TARGET_SRCROOT)/engine_build/godot-src",
+      "$(PODS_TARGET_SRCROOT)/prebuilt/include",
       "$(PODS_TARGET_SRCROOT)/ios",
     ].join(" "),
     # NOTE: Do NOT add -ObjC here! It force-loads all object files from

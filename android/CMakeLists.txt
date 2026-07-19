@@ -31,26 +31,16 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/NitroGodot+autolinking
 target_include_directories(NitroGodot PRIVATE
   # Our hand-authored C++ headers
   ../cpp
-  # libgodot.h + gdextension_interface.gen.h from the Godot source tree
-  ../engine_build/godot-src/core/extension
-  ../engine_build/godot-src
+  # libgodot.h + gdextension_interface.gen.h (shipped in prebuilt/include)
+  ../prebuilt/include
 )
 
-# ── libgodot prebuilt shared library (Godot master branch build output) ──────
-#
-# The Android SCons build produces libgodot_android.so (the full engine).
-# We declare it as an IMPORTED target so CMake can resolve the link
-# without recompiling.
-#
-# The Android SCons build emits the engine .so per-ABI under:
-#   platform/android/java/lib/libs/<release|debug>/<abi>/libgodot_android.so
-# Use ${ANDROID_ABI} (provided by the NDK toolchain) so each ABI's slice is
-# selected automatically — build the engine for every ABI you ship (the engine
-# build currently produces arm64-v8a only). Override the variant with
+# The prebuilt/ directory ships the per-ABI .so built by the Godot SCons
+# build (engine_build/build_godot.sh).  Override the variant with
 # -DGODOT_ANDROID_BUILD=debug if you compiled a debug engine.
 set(GODOT_ANDROID_BUILD "release" CACHE STRING "Godot Android build variant (release|debug)")
 set(GODOT_ANDROID_SO
-  "${CMAKE_CURRENT_SOURCE_DIR}/../engine_build/godot-src/platform/android/java/lib/libs/${GODOT_ANDROID_BUILD}/${ANDROID_ABI}/libgodot_android.so")
+  "${CMAKE_CURRENT_SOURCE_DIR}/../prebuilt/android/${ANDROID_ABI}/libgodot_android.so")
 
 if(NOT EXISTS "${GODOT_ANDROID_SO}")
   message(WARNING "libgodot_android.so not found for ABI '${ANDROID_ABI}' at:\n  ${GODOT_ANDROID_SO}\n"
