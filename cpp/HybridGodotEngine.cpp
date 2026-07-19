@@ -646,6 +646,7 @@ void HybridGodotEngine::start() {
 
     LOGI("Entering Godot render loop\n");
     while (is_running_.load(std::memory_order_acquire)) {
+      const auto frame_start = std::chrono::steady_clock::now();
       if (is_paused_.load(std::memory_order_acquire)) {
         // While paused, sleep longer to reduce CPU usage
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -693,8 +694,15 @@ void HybridGodotEngine::start() {
         break;
       }
 
-      // ~60fps frame pacing (16.6ms)
-      std::this_thread::sleep_for(std::chrono::microseconds(16600));
+      // ~60fps frame pacing: sleep only the REMAINDER of the 16.6ms frame
+      // budget. An unconditional sleep here adds a full frame-length stall on
+      // top of however long iteration() took, capping the engine below 60fps
+      // everywhere (e.g. a 45ms iteration becomes 62ms → 16fps instead of 22).
+      const auto frame_elapsed = std::chrono::steady_clock::now() - frame_start;
+      constexpr auto kFrameBudget = std::chrono::microseconds(16600);
+      if (frame_elapsed < kFrameBudget) {
+        std::this_thread::sleep_for(kFrameBudget - frame_elapsed);
+      }
     }
 
     if (sn_destroy) sn_destroy(sn_iteration.data);

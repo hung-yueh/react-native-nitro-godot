@@ -1,6 +1,6 @@
 # Engine Patches
 
-Version-pinned patches for Godot **4.7-stable** to enable the `libgodot` C-API
+Version-pinned patches for Godot **4.7.1-stable** to enable the `libgodot` C-API
 for React Native embedding.
 
 | Patch | Description |
