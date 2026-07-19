@@ -48,7 +48,7 @@
     "type": "git",
     "url": "git+https://github.com/hung-yueh/react-native-nitro-godot.git"
   },
-  "author": "",
+  "author": "Hugh Chen (https://github.com/hung-yueh)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/hung-yueh/react-native-nitro-godot/issues"
@@ -93,6 +93,5 @@
         }
       ]
     ]
-  },
-  "packageManager": "yarn@3.6.1"
+  }
 }
