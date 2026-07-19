@@ -1,0 +1,37 @@
+# ── Dev / CI files ───────────────────────────────────────────────
+.agents/
+.codegraph/
+.github/
+.vscode/
+lab/
+examples/
+engine_build/
+docs/
+
+# ── Source/test files not needed at runtime ──────────────────────
+src/
+src/__tests__/
+tsconfig.json
+tsconfig.build.json
+jest.config.js
+.eslintrc*
+.prettierrc*
+ARCHITECTURE.md
+RNBRIDGE_SETUP.md
+GODOT_PROPOSAL*.md
+THIRD_PARTY_LICENSES.md
+CHANGELOG.md
+
+# ── Build artifacts ─────────────────────────────────────────────
+android/build/
+android/.cxx/
+android/.gradle/
+*.tgz
+
+# ── OS / editor junk ───────────────────────────────────────────
+.DS_Store
+*.swp
+*.swo
+.npmrc
+.env
+.env.*

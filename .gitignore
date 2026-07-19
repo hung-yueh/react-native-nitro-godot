@@ -35,6 +35,7 @@ engine_build/tmp_apk/
 engine_build/*.tar.gz
 engine_build/*.zip
 engine_build/build_log.txt
+prebuilt/
 
 # ========================
 # Godot editor artifacts
