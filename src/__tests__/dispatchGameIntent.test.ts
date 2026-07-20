@@ -25,6 +25,7 @@ function createMockWrapper(): GodotEngineWrapper & { _sentMessages: string[] } {
     suspendOS: jest.fn(),
     resumeOS: jest.fn(),
     notifyPollingStopped: jest.fn(),
+    getFrameStats: jest.fn(() => ({ producedFps: 0, presentedFps: 0, worstFrameMs: 0 })),
     destroy: jest.fn(),
   };
 }

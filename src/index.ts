@@ -20,7 +20,7 @@ export { createGodotEngine } from './GodotEngine';
 export type { GodotEngineWrapper, MessageHandler } from './GodotEngine';
 
 // ── Nitro Spec (for advanced use / direct JSI access) ─────────────────
-export type { GodotEngine } from './GodotEngine.nitro';
+export type { GodotEngine, FrameStats } from './GodotEngine.nitro';
 
 // ── Epic 5: CQRS State Sync ──────────────────────────────────────────────
 export { state$, ingestStateSync } from './godotState';

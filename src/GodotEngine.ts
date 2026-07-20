@@ -17,7 +17,7 @@
  */
 
 import { NitroModules } from 'react-native-nitro-modules';
-import type { GodotEngine as GodotEngineSpec } from './GodotEngine.nitro';
+import type { GodotEngine as GodotEngineSpec, FrameStats } from './GodotEngine.nitro';
 
 export type MessageHandler = (message: string) => void;
 
@@ -51,6 +51,15 @@ export interface GodotEngineWrapper {
 
   /** Notify C++ that polling has stopped */
   notifyPollingStopped(): void;
+
+  /**
+   * Real frame-timing stats over the interval since the last call: engine
+   * iteration rate vs frames actually presented to the display, plus the worst
+   * present gap. Poll on a fixed cadence (e.g. 500ms) for a live readout. See
+   * {@link FrameStats}. NOTE: the in-engine/counter fps is `producedFps`;
+   * `presentedFps` is what the user actually sees.
+   */
+  getFrameStats(): FrameStats;
 
   /** Destroy the engine and clean up */
   destroy(): void;
@@ -166,6 +175,10 @@ export function createGodotEngine(pckPath: string): GodotEngineWrapper {
 
     notifyPollingStopped() {
       engine.notifyPollingStopped();
+    },
+
+    getFrameStats(): FrameStats {
+      return engine.getFrameStats();
     },
 
     destroy() {

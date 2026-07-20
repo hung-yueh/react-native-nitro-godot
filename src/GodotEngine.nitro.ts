@@ -1,6 +1,33 @@
 import { type HybridObject, type UInt64 } from 'react-native-nitro-modules';
 
 /**
+ * Real frame-timing stats for the embedded engine.
+ *
+ * The distinction here is the whole point: the engine's iteration rate is NOT
+ * what the user sees. The render loop dispatch_syncs iteration() onto the main
+ * thread; if it hogs the main thread, CoreAnimation can't commit frames and the
+ * on-screen rate collapses far below the iteration rate. Expose both so you can
+ * see the gap (and never ship a single "fps" number that lies).
+ */
+export interface FrameStats {
+  /** Engine render/iteration rate — how often the Godot main loop ran (frames/sec). */
+  producedFps: number;
+  /**
+   * Frames actually presented to the display (frames/sec). On iOS this is a
+   * CADisplayLink-based count of present opportunities the main run loop
+   * actually serviced — when the main thread is starved this drops below
+   * producedFps, which is exactly the "counter says 40, screen shows 9" case.
+   * Currently iOS-only; 0 on platforms without present instrumentation.
+   */
+  presentedFps: number;
+  /**
+   * Longest gap between consecutive presented frames since the previous call
+   * (milliseconds) — the stutter/jank indicator. Reset on each read.
+   */
+  worstFrameMs: number;
+}
+
+/**
  * GodotEngine HybridObject - zero-overhead JSI bridge to libgodot.
  *
  * Enforces pure C++ code generation for both iOS and Android via
@@ -178,5 +205,14 @@ export interface GodotEngine extends HybridObject<{ ios: 'c++', android: 'c++' }
    * Also pushed as ENGINE_ERROR messages through the SPSC queue.
    */
   getLastError(): string;
+
+  // ─── Frame Timing ─────────────────────────────────────────────────────────
+
+  /**
+   * Returns real frame-timing stats (see {@link FrameStats}). Rates are
+   * measured over the interval since the previous call, so poll it on a fixed
+   * cadence (e.g. every 500ms) for a live readout. Cheap; safe to call from JS.
+   */
+  getFrameStats(): FrameStats;
 }
 

@@ -13,13 +13,15 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-
+// Forward declaration of `FrameStats` to properly resolve imports.
+namespace margelo::nitro::godot { struct FrameStats; }
 
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
 #include <vector>
 #include <optional>
+#include "FrameStats.hpp"
 
 namespace margelo::nitro::godot {
 
@@ -70,6 +72,7 @@ namespace margelo::nitro::godot {
       virtual void sendDragEvent(double x, double y, double relativeX, double relativeY, double velocityX, double velocityY, double index) = 0;
       virtual void resizeSurface(double width, double height) = 0;
       virtual std::string getLastError() = 0;
+      virtual FrameStats getFrameStats() = 0;
 
     protected:
       // Hybrid Setup

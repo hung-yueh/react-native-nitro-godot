@@ -462,6 +462,70 @@ C++ LOGE() → _setLastError(layer, msg)
               └── console.error(msg)
 ```
 
+## 📊 Measuring Real (Presented) FPS
+
+**Do not trust an in-engine fps counter to tell you what the user sees.** Godot's
+`Engine.get_frames_per_second()` (and any JS/RN fps readout) measures the
+**render / iteration rate** — how often the Godot main loop runs. That is not the
+**present rate** — how many frames CoreAnimation actually commits to the display.
+
+They can diverge sharply. The render loop drives `iteration()` from a background
+thread that `dispatch_sync`s onto the main thread. If a frame takes at least a
+full frame budget to render+present, the loop stops yielding, the main run loop
+can't cycle, and CADisplayLink can't commit the rendered frame — so most rendered
+frames never reach the screen. This is most visible on the **iOS Simulator**,
+whose software-emulated GL present is slow: we have observed the counter reading
+**~40fps while only ~9fps was actually presented**. (The render loop guarantees a
+minimum per-frame main-thread yield to keep CoreAnimation fed — see the frame
+pacing in `cpp/HybridGodotEngine.cpp` — but slow environments can still present
+below the iteration rate, so always measure the real thing.)
+
+### At runtime: `getFrameStats()`
+
+For a live, in-app readout (dev HUD or production telemetry), the engine exposes
+`getFrameStats()` — returning both rates so the gap is visible:
+
+```ts
+// Poll on a fixed cadence (e.g. every 500ms); rates are measured over the interval.
+const { producedFps, presentedFps, worstFrameMs } = engine.getFrameStats();
+// producedFps  — engine iteration rate (the number a naive counter would show)
+// presentedFps — frames actually reaching the display (iOS: CADisplayLink-based;
+//                collapses below producedFps when the main thread is starved)
+// worstFrameMs — longest gap between presented frames since the last call (jank)
+```
+
+A healthy pipeline reads `presentedFps` ≈ display rate with `producedFps` close
+behind; **`presentedFps` collapsing far below `producedFps` is the starvation
+signal** (e.g. "presented 9 / produced 40"). Validated against the recording
+method below: on the iOS simulator `getFrameStats()` reported ~35 presentedFps
+where a screen recording independently measured ~40 — i.e. it tracks reality, not
+the inflated iteration count. (iOS today; Android `Choreographer` support is a
+follow-up — `presentedFps` is 0 there for now.)
+
+### Measure it (recording — ground truth / CI)
+
+[`scripts/measure-present-fps.sh`](scripts/measure-present-fps.sh) reports the
+true on-screen present rate by recording the composited screen and analyzing the
+frame timestamps (`simctl recordVideo` is variable-frame-rate — it encodes a
+frame only when the screen changes, so the gaps between frame PTS are the real
+present intervals):
+
+```bash
+# Record the simulator for 12s while you interact with the app, then print the
+# real presented-frame rate distribution (median/p90 interval + implied fps):
+scripts/measure-present-fps.sh <simulator-udid> 12
+
+# Or analyze a recording you already have, optionally within a time window:
+scripts/measure-present-fps.sh --analyze gameplay.mp4 10.5 15
+```
+
+For a reading that's independent of whether your scene is animating, add a node
+that changes every frame (rotate/translate a sprite in `_process`) so every
+presented frame differs — then the script measures the pure present rate.
+
+On a **real device**, use Xcode **Instruments → Core Animation FPS** or **Metal
+System Trace** for hardware-accurate presented-frame timing.
+
 ## 📚 Additional Documentation
 
 - [Architecture Deep-Dive](ARCHITECTURE.md) — detailed design document covering threading model, SPSC queue internals, and GDExtension integration

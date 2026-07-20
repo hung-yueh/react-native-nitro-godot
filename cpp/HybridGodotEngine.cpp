@@ -25,6 +25,7 @@
 ///
 
 #include "HybridGodotEngine.hpp"
+#include "FrameCounters.hpp"
 #include "GDExtensionTypes.h"
 
 #include <chrono>
@@ -118,6 +119,11 @@
 #endif
 
 namespace margelo::nitro::godot {
+
+// Definitions for the cross-language frame counters declared in FrameCounters.hpp.
+std::atomic<uint64_t> g_frames_produced{0};
+std::atomic<uint64_t> g_frames_presented{0};
+std::atomic<uint64_t> g_worst_present_us{0};
 
 // Opaque type sizes and typedefs are defined in GDExtensionTypes.h
 
@@ -693,6 +699,11 @@ void HybridGodotEngine::start() {
         _setLastError("render", "Godot render loop iteration failed");
         break;
       }
+
+      // One completed iteration() == one frame submitted for present. Counts on
+      // the render thread and covers both the iOS (dispatch_sync) and Android
+      // (direct) paths, since it sits below the platform #if/#else above.
+      g_frames_produced.fetch_add(1, std::memory_order_relaxed);
 
       // Frame pacing, two goals:
       //  1) ~60fps target: sleep the REMAINDER of the 16.6ms budget when
@@ -2063,6 +2074,38 @@ void HybridGodotEngine::_flushInboundQueues() {
 std::string HybridGodotEngine::getLastError() {
   std::lock_guard<std::mutex> lock(error_mutex_);
   return last_error_;
+}
+
+// ── Frame Timing ─────────────────────────────────────────────────────────────
+
+FrameStats HybridGodotEngine::getFrameStats() {
+  std::lock_guard<std::mutex> lock(frame_stats_mutex_);
+
+  const auto now = std::chrono::steady_clock::now();
+  const uint64_t produced = g_frames_produced.load(std::memory_order_relaxed);
+  const uint64_t presented = g_frames_presented.load(std::memory_order_relaxed);
+  // Read-and-reset the worst present gap so it reflects this interval only.
+  const double worstMs =
+      g_worst_present_us.exchange(0, std::memory_order_relaxed) / 1000.0;
+
+  double producedFps = 0.0;
+  double presentedFps = 0.0;
+  if (frame_stats_primed_) {
+    const double dt =
+        std::chrono::duration<double>(now - frame_stats_last_time_).count();
+    if (dt > 1e-4) {
+      producedFps = static_cast<double>(produced - frame_stats_last_produced_) / dt;
+      presentedFps =
+          static_cast<double>(presented - frame_stats_last_presented_) / dt;
+    }
+  }
+
+  frame_stats_last_time_ = now;
+  frame_stats_last_produced_ = produced;
+  frame_stats_last_presented_ = presented;
+  frame_stats_primed_ = true;
+
+  return FrameStats(producedFps, presentedFps, worstMs);
 }
 
 void HybridGodotEngine::_setLastError(const std::string& layer, const std::string& msg) {
