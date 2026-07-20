@@ -32,6 +32,7 @@ namespace margelo::nitro::godot {
       prototype.registerHybridMethod("sendDragEvent", &HybridGodotEngineSpec::sendDragEvent);
       prototype.registerHybridMethod("resizeSurface", &HybridGodotEngineSpec::resizeSurface);
       prototype.registerHybridMethod("getLastError", &HybridGodotEngineSpec::getLastError);
+      prototype.registerHybridMethod("getFrameStats", &HybridGodotEngineSpec::getFrameStats);
     });
   }
 

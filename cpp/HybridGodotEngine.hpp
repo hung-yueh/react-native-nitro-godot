@@ -209,6 +209,14 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
    */
   std::string getLastError() override;
 
+  /**
+   * Returns real frame-timing stats measured over the interval since the last
+   * call: engine iteration rate (producedFps) vs frames actually presented to
+   * the display (presentedFps), plus the worst present gap (worstFrameMs).
+   * See FrameCounters.hpp. Thread-safe; guarded by frame_stats_mutex_.
+   */
+  FrameStats getFrameStats() override;
+
  public:
   // ── Godot→JS message injection (called from Godot thread) ───────────────
 
@@ -428,6 +436,15 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
   /// Last critical error message. Written from any thread, read from JS.
   std::string last_error_;
   std::mutex  error_mutex_;
+
+  // ── Frame Stats sampling state ───────────────────────────────────────
+  /// Baseline (counter + timestamp) captured on the previous getFrameStats()
+  /// call, so each call reports the rate over the interval since the last one.
+  std::mutex frame_stats_mutex_;
+  std::chrono::steady_clock::time_point frame_stats_last_time_{};
+  uint64_t frame_stats_last_produced_{0};
+  uint64_t frame_stats_last_presented_{0};
+  bool frame_stats_primed_{false};
 };
 
 }  // namespace margelo::nitro::godot

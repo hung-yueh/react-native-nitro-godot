@@ -47,6 +47,9 @@ export function createMockEngine() {
     // Camera projection
     unprojectPosition: jest.fn(() => [0, 0]),
 
+    // Frame timing
+    getFrameStats: jest.fn(() => ({ producedFps: 0, presentedFps: 0, worstFrameMs: 0 })),
+
     // ── Test helpers (not part of real API) ──
     /** Enqueue a message as if Godot sent it */
     _enqueueTestMessage(msg: string) {

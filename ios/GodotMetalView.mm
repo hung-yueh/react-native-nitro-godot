@@ -13,9 +13,19 @@
 #import "GodotMetalView.h"
 #import <React/RCTBridge.h>
 #import <React/UIView+React.h>
+#import <QuartzCore/CADisplayLink.h>
+
+#include "../cpp/FrameCounters.hpp"
 
 @implementation GodotMetalView {
   BOOL _surfaceEmitted;
+  // Present instrumentation: a CADisplayLink on the main run loop ticks once per
+  // display refresh the run loop actually serviced. Because the render loop
+  // dispatch_syncs iteration() onto the main thread, these ticks only fire when
+  // the main thread gets to breathe — so the tick rate is the real present rate,
+  // and the produced-vs-presented gap (see FrameCounters.hpp) surfaces starvation.
+  CADisplayLink* _presentLink;
+  CFTimeInterval _lastPresentTs;
 }
 
 // ── Layer override ─────────────────────────────────────────────────────────
@@ -56,6 +66,8 @@
     if (self.onSurfaceCreated) {
       self.onSurfaceCreated(@{ @"pointer": hexPtr });
     }
+
+    [self startPresentLink];
   }
 }
 
@@ -64,10 +76,39 @@
 
   if (newWindow == nil && _surfaceEmitted) {
     _surfaceEmitted = NO;
+    [self stopPresentLink];
     if (self.onSurfaceDestroyed) {
       self.onSurfaceDestroyed(@{});
     }
   }
+}
+
+// ── Present-rate instrumentation ────────────────────────────────────────────
+
+- (void)startPresentLink {
+  if (_presentLink != nil) return;
+  _lastPresentTs = 0;
+  _presentLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onPresentTick:)];
+  [_presentLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopPresentLink {
+  [_presentLink invalidate];
+  _presentLink = nil;
+}
+
+- (void)onPresentTick:(CADisplayLink*)link {
+  using namespace margelo::nitro::godot;
+  g_frames_presented.fetch_add(1, std::memory_order_relaxed);
+  if (_lastPresentTs > 0) {
+    double dtUs = (link.timestamp - _lastPresentTs) * 1e6;
+    if (dtUs > 0) recordPresentInterval(static_cast<uint64_t>(dtUs));
+  }
+  _lastPresentTs = link.timestamp;
+}
+
+- (void)dealloc {
+  [self stopPresentLink];
 }
 
 // ── Layout ────────────────────────────────────────────────────────────────

@@ -480,7 +480,29 @@ minimum per-frame main-thread yield to keep CoreAnimation fed — see the frame
 pacing in `cpp/HybridGodotEngine.cpp` — but slow environments can still present
 below the iteration rate, so always measure the real thing.)
 
-### Measure it
+### At runtime: `getFrameStats()`
+
+For a live, in-app readout (dev HUD or production telemetry), the engine exposes
+`getFrameStats()` — returning both rates so the gap is visible:
+
+```ts
+// Poll on a fixed cadence (e.g. every 500ms); rates are measured over the interval.
+const { producedFps, presentedFps, worstFrameMs } = engine.getFrameStats();
+// producedFps  — engine iteration rate (the number a naive counter would show)
+// presentedFps — frames actually reaching the display (iOS: CADisplayLink-based;
+//                collapses below producedFps when the main thread is starved)
+// worstFrameMs — longest gap between presented frames since the last call (jank)
+```
+
+A healthy pipeline reads `presentedFps` ≈ display rate with `producedFps` close
+behind; **`presentedFps` collapsing far below `producedFps` is the starvation
+signal** (e.g. "presented 9 / produced 40"). Validated against the recording
+method below: on the iOS simulator `getFrameStats()` reported ~35 presentedFps
+where a screen recording independently measured ~40 — i.e. it tracks reality, not
+the inflated iteration count. (iOS today; Android `Choreographer` support is a
+follow-up — `presentedFps` is 0 there for now.)
+
+### Measure it (recording — ground truth / CI)
 
 [`scripts/measure-present-fps.sh`](scripts/measure-present-fps.sh) reports the
 true on-screen present rate by recording the composited screen and analyzing the
