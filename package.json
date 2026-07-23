@@ -58,7 +58,7 @@
   "bugs": {
     "url": "https://github.com/hung-yueh/react-native-nitro-godot/issues"
   },
-  "homepage": "https://github.com/hung-yueh/react-native-nitro-godot#readme",
+  "homepage": "https://libgodot.net",
   "peerDependencies": {
     "react": "*",
     "react-native": "*",
