@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>react-native-nitro-godot — Godot Engine inside React Native</title>
+<meta name="description" content="Embed the Godot Engine as a native surface in React Native. Pure C++ JSI via Nitro Modules — lock-free SPSC queues, zero-copy buffers, 100% thread isolation." />
+<meta property="og:title" content="react-native-nitro-godot" />
+<meta property="og:description" content="The Godot Engine, inside React Native. Zero mutexes. Zero copies. Zero bridge." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23050508'/%3E%3Ccircle cx='11' cy='16' r='5' fill='none' stroke='%2300f0ff' stroke-width='2.5'/%3E%3Ccircle cx='21' cy='16' r='5' fill='none' stroke='%23ff2d95' stroke-width='2.5'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ══════════ BOOT OVERLAY ══════════ -->
+<div class="boot" id="boot" aria-hidden="true">
+  <div class="boot-inner">
+    <div class="boot-rings"><span></span><span></span></div>
+    <div class="boot-log mono" id="bootLog">libgodot_create_godot_instance()</div>
+    <div class="boot-bar"><div class="boot-bar-fill" id="bootFill"></div></div>
+  </div>
+</div>
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav-logo" href="#top" aria-label="react-native-nitro-godot home">
+    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="11" cy="16" r="6" fill="none" stroke="var(--cyan)" stroke-width="2.5"/>
+      <circle cx="21" cy="16" r="6" fill="none" stroke="var(--magenta)" stroke-width="2.5"/>
+    </svg>
+    <span class="mono">nitro-godot</span>
+  </a>
+  <nav class="nav-links" aria-label="Primary">
+    <a href="#threads">Threads</a>
+    <a href="#features">Features</a>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#api">API</a>
+    <a href="#bridge">RNBridge</a>
+  </nav>
+  <div class="nav-cta">
+    <a class="btn btn-ghost btn-sm mono" href="https://github.com/hung-yueh/react-native-nitro-godot" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero" id="hero">
+  <canvas id="threadCanvas" aria-hidden="true"></canvas>
+  <div class="hero-glow" id="heroGlow" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="hero-content">
+    <p class="eyebrow mono reveal">
+      <span class="dot dot-cyan"></span> JS THREAD · 120 Hz
+      <span class="eyebrow-sep">⇄</span>
+      <span class="dot dot-magenta"></span> GODOT THREAD · 60 Hz
+    </p>
+    <h1 class="hero-title reveal">
+      The Godot Engine,<br/>
+      <span class="grad">inside React Native.</span>
+    </h1>
+    <p class="hero-sub reveal">
+      A Nitro Module that embeds <span class="mono hl-c">libgodot</span> as a native rendering
+      surface. Pure C++ over JSI — no Swift, no Kotlin, no bridge. Two threads, two clocks,
+      and not a single lock between them.
+    </p>
+    <div class="hero-ctas reveal">
+      <a class="btn btn-primary magnetic" href="#quickstart">Get started</a>
+      <a class="btn btn-ghost magnetic mono" href="https://github.com/hung-yueh/react-native-nitro-godot" target="_blank" rel="noopener">npm i react-native-nitro-godot</a>
+    </div>
+    <div class="hero-stats reveal">
+      <div class="stat"><span class="stat-n" data-count="0">0</span><span class="stat-l">mutexes on the hot path</span></div>
+      <div class="stat"><span class="stat-n" data-count="0">0</span><span class="stat-l">copies for ArrayBuffers</span></div>
+      <div class="stat"><span class="stat-n" data-count="120">0</span><span class="stat-l">Hz UI under 3D load</span></div>
+      <div class="stat"><span class="stat-n" data-count="100">0</span><span class="stat-l">% thread isolation</span></div>
+    </div>
+  </div>
+
+  <a class="scroll-hint mono" href="#threads" aria-label="Scroll to content">
+    <span>SCROLL</span><span class="scroll-line"></span>
+  </a>
+</section>
+
+<!-- ══════════ THREAD MODEL ══════════ -->
+<section class="section" id="threads">
+  <div class="wrap">
+    <p class="eyebrow mono reveal"><span class="tick"></span>THREAD SAFETY MODEL</p>
+    <h2 class="reveal">Two clocks. Zero contention.</h2>
+    <p class="lede reveal">
+      The JS thread never calls a Godot API. The Godot thread never touches the JS runtime.
+      Every byte that crosses over flows through lock-free SPSC queues or atomic double-buffers —
+      drained once per Godot frame, after <span class="mono hl-c">_process()</span>.
+    </p>
+
+    <div class="lane-table reveal glass">
+      <div class="lane lane-js">
+        <div class="lane-head">
+          <span class="dot dot-cyan"></span>
+          <span class="mono">JS THREAD</span>
+          <span class="lane-hz mono">120 Hz</span>
+        </div>
+        <ul class="mono">
+          <li class="ok">SPSC enqueue / dequeue</li>
+          <li class="ok">atomic camera reads</li>
+          <li class="ok">unprojectPosition() — pure math</li>
+          <li class="no">Godot API · variant_call · classdb</li>
+        </ul>
+      </div>
+      <div class="lane-bridge" aria-hidden="true">
+        <div class="bridge-pipe pipe-out"><span class="pipe-label mono">outbound SPSC</span></div>
+        <div class="bridge-pipe pipe-in"><span class="pipe-label mono">inbound SPSC</span></div>
+        <div class="bridge-pipe pipe-touch"><span class="pipe-label mono">touch SPSC</span></div>
+        <div class="bridge-pipe pipe-cam"><span class="pipe-label mono">camera double-buf</span></div>
+      </div>
+      <div class="lane lane-godot">
+        <div class="lane-head">
+          <span class="dot dot-magenta"></span>
+          <span class="mono">GODOT THREAD</span>
+          <span class="lane-hz mono">60 Hz</span>
+        </div>
+        <ul class="mono">
+          <li class="ok">SPSC enqueue / dequeue</li>
+          <li class="ok">variant_call · Input.parse_input_event()</li>
+          <li class="ok">atomic camera writes</li>
+          <li class="no">JS runtime · JSI</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section class="section" id="features">
+  <div class="wrap">
+    <p class="eyebrow mono reveal"><span class="tick"></span>WHY THIS EXISTS</p>
+    <h2 class="reveal">Built like an engine,<br/>shipped like a module.</h2>
+
+    <div class="grid feat-grid">
+      <article class="card glass reveal">
+        <div class="card-glyph mono">⟐</div>
+        <h3>Zero vendor lock-in</h3>
+        <p>Compile <span class="mono">libgodot</span> straight from official Godot source (pinned <span class="mono">4.7-stable</span>). Your C++ modules, your engine flags, your upgrade schedule.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">⇉</div>
+        <h3>True zero-copy memory</h3>
+        <p>Hand a 10&nbsp;MB <span class="mono">ArrayBuffer</span> — AI tensor output, mesh data — from JS to Godot's rendering device as a pointer. No serialization, no GC churn.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">◫</div>
+        <h3>Deterministic UI performance</h3>
+        <p>Godot runs on its own <span class="mono">std::thread</span>. Under heavy 3D GPU load your React Native UI stays smooth at 120&nbsp;FPS — the threads can't stall each other.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">⚟</div>
+        <h3>Event-driven messaging</h3>
+        <p>No blind polling. A <span class="mono">rAF</span> drain loop wakes only when Godot enqueues — <span class="mono">setOnWakeUp()</span> replaces the busy-wait tax entirely.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">⌖</div>
+        <h3>3D→2D projection at 120 Hz</h3>
+        <p>Pin a React Native view over a 3D target with <span class="mono">unprojectPosition()</span> — cached camera matrices, pure math, safe inside Reanimated worklets.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">⛶</div>
+        <h3>CQRS state sync</h3>
+        <p>Godot is the authoritative server; Legend-State observables drive HUD updates at 60&nbsp;Hz+ with <strong>zero React re-renders</strong>. Send intents down, get <span class="mono">STATE_SYNC</span> back.</p>
+      </article>
+      <article class="card glass reveal">
+        <div class="card-glyph mono">☷</div>
+        <h3>Native touch forwarding</h3>
+        <p>Touches enqueue lock-free and dispatch on the Godot thread through <span class="mono">Input.parse_input_event()</span> — Godot UI, physics, and drag all just work.</p>
+      </article>
+      <article class="card glyph-warn glass reveal">
+        <div class="card-glyph mono">☾</div>
+        <h3>OS lifecycle safety</h3>
+        <p>Automatic suspend/resume on background/foreground with ghost-touch mitigation. No GPU-timeout crashes when the app leaves the screen.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FPS TRUTH ══════════ -->
+<section class="section section-tight" id="fps">
+  <div class="wrap">
+    <div class="fps-panel glass reveal">
+      <div class="fps-copy">
+        <p class="eyebrow mono"><span class="tick tick-magenta"></span>MEASURE WHAT SHIPS</p>
+        <h2>Your FPS counter is lying to you.</h2>
+        <p>
+          In-engine counters measure how often the loop <em>runs</em> — not how many frames
+          CoreAnimation actually <em>presents</em>. We've watched a counter read ~40&nbsp;fps
+          while only ~9 reached the screen. So the engine reports both:
+        </p>
+        <a class="btn btn-ghost btn-sm mono magnetic" href="https://github.com/hung-yueh/react-native-nitro-godot#-measuring-real-presented-fps" target="_blank" rel="noopener">Read the deep-dive →</a>
+      </div>
+      <div class="fps-demo mono" aria-hidden="true">
+        <div class="fps-row"><span class="fps-key">producedFps</span><span class="fps-val c">40.1</span><span class="fps-note">// what a naive counter shows</span></div>
+        <div class="fps-row"><span class="fps-key">presentedFps</span><span class="fps-val m">9.3</span><span class="fps-note">// what the user actually sees</span></div>
+        <div class="fps-row"><span class="fps-key">worstFrameMs</span><span class="fps-val">216</span><span class="fps-note">// the jank you'd have missed</span></div>
+        <div class="fps-src">engine.getFrameStats()</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ QUICKSTART ══════════ -->
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <p class="eyebrow mono reveal"><span class="tick"></span>QUICKSTART</p>
+    <h2 class="reveal">One hook. Full lifecycle.</h2>
+    <p class="lede reveal">
+      <span class="mono hl-c">useGodotEngine</span> manages start, polling, touch forwarding,
+      suspend/resume, and teardown. Drop a <span class="mono hl-m">&lt;GodotView /&gt;</span> in
+      and you're rendering.
+    </p>
+
+    <div class="code-cols">
+      <figure class="code-block glass reveal">
+        <figcaption class="code-head mono"><span class="code-dots"><i></i><i></i><i></i></span>install</figcaption>
+<pre class="mono"><code><span class="t-c"># core</span>
+<span class="t-fn">npm</span> install react-native-nitro-godot react-native-nitro-modules
+
+<span class="t-c"># optional: zero-render CQRS state sync</span>
+<span class="t-fn">npm</span> install @legendapp/state@beta
+
+<span class="t-c"># iOS</span>
+<span class="t-fn">cd</span> ios && pod install</code></pre>
+      </figure>
+
+      <figure class="code-block glass reveal">
+        <figcaption class="code-head mono"><span class="code-dots"><i></i><i></i><i></i></span>GameScreen.tsx</figcaption>
+<pre class="mono"><code><span class="t-k">import</span> { useGodotEngine, GodotView } <span class="t-k">from</span> <span class="t-s">"react-native-nitro-godot"</span>;
+
+<span class="t-k">function</span> <span class="t-fn">GameScreen</span>() {
+  <span class="t-k">const</span> { engineState, lastError, surfaceCallbacks,
+          handleTouchEvent, sendMessage } =
+    <span class="t-fn">useGodotEngine</span>(pckPath, (msg) =&gt; <span class="t-o">console</span>.<span class="t-fn">log</span>(<span class="t-s">"Godot:"</span>, msg));
+
+  <span class="t-k">return</span> (
+    &lt;<span class="t-o">View</span> style={StyleSheet.absoluteFill}&gt;
+      &lt;<span class="t-m">GodotView</span>
+        style={StyleSheet.absoluteFill}
+        {...surfaceCallbacks}
+        onTouchEvent={handleTouchEvent}
+      /&gt;
+    &lt;/<span class="t-o">View</span>&gt;
+  );
+}</code></pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ API ══════════ -->
+<section class="section" id="api">
+  <div class="wrap">
+    <p class="eyebrow mono reveal"><span class="tick"></span>API REFERENCE</p>
+    <h2 class="reveal">The HybridObject surface.</h2>
+    <p class="lede reveal">
+      Every method below is a direct JSI call into C++ — no bridge serialization, no async tax
+      unless the operation is genuinely async.
+    </p>
+
+    <div class="api-groups">
+      <div class="api-group reveal">
+        <h3 class="mono api-group-title"><span class="dot dot-cyan"></span>LIFECYCLE</h3>
+        <div class="api-rows glass">
+          <div class="api-row"><code class="mono">initialize(pckPath)</code><p>Load a <span class="mono">.pck</span> from an absolute file-system path.</p></div>
+          <div class="api-row"><code class="mono">start()</code><p>Spawn the render thread; the Godot main loop begins at ~60&nbsp;Hz.</p></div>
+          <div class="api-row"><code class="mono">pause()</code><p>Pause the main loop without destroying engine state.</p></div>
+          <div class="api-row"><code class="mono">suspendOS() / resumeOS(ptr)</code><p>Background/foreground handling — prevents GPU-timeout crashes.</p></div>
+          <div class="api-row"><code class="mono">destroy()</code><p>Stop the thread, then <span class="mono">libgodot_destroy_godot_instance()</span>.</p></div>
+        </div>
+      </div>
+
+      <div class="api-group reveal">
+        <h3 class="mono api-group-title"><span class="dot dot-magenta"></span>SURFACE &amp; RENDERING</h3>
+        <div class="api-rows glass">
+          <div class="api-row"><code class="mono">attachSurface(ptr: bigint)</code><p>Bind <span class="mono">ANativeWindow*</span> (Android) or <span class="mono">CAMetalLayer*</span> (iOS).</p></div>
+          <div class="api-row"><code class="mono">resizeSurface(w, h)</code><p>Sync Godot viewport + swapchain to the native surface.</p></div>
+          <div class="api-row"><code class="mono">updateSharedBuffer(buf)</code><p>Zero-copy <span class="mono">ArrayBuffer</span> handoff — pointer only.</p></div>
+          <div class="api-row"><code class="mono">getFrameStats()</code><p>Produced vs <em>presented</em> FPS + worst frame time.</p></div>
+        </div>
+      </div>
+
+      <div class="api-group reveal">
+        <h3 class="mono api-group-title"><span class="dot dot-cyan"></span>MESSAGING</h3>
+        <div class="api-rows glass">
+          <div class="api-row"><code class="mono">sendMessage(msg)</code><p>Enqueue into the inbound SPSC; dispatched to GDScript on the Godot thread.</p></div>
+          <div class="api-row"><code class="mono">pollMessage()</code><p>Pop the outbound SPSC. Returns <span class="mono">""</span> when empty — safe at 120&nbsp;Hz.</p></div>
+          <div class="api-row"><code class="mono">setOnWakeUp(cb)</code><p>Fires when Godot enqueues while JS isn't polling — the event-driven core.</p></div>
+          <div class="api-row"><code class="mono">loadSceneAsync(pckPath)</code><p>Async scene loading with progress events over the queue.</p></div>
+        </div>
+      </div>
+
+      <div class="api-group reveal">
+        <h3 class="mono api-group-title"><span class="dot dot-magenta"></span>INPUT &amp; PROJECTION</h3>
+        <div class="api-rows glass">
+          <div class="api-row"><code class="mono">sendTouchEvent(x, y, pressed, i)</code><p>Forward press/release as <span class="mono">InputEventScreenTouch</span>.</p></div>
+          <div class="api-row"><code class="mono">sendDragEvent(x, y, …)</code><p>Forward drags as <span class="mono">InputEventScreenDrag</span> with velocity.</p></div>
+          <div class="api-row"><code class="mono">unprojectPosition(x, y, z)</code><p>3D world → 2D screen. Pure math, atomic reads, worklet-safe.</p></div>
+          <div class="api-row"><code class="mono">getLastError()</code><p>Last critical engine error — first stop when the view is blank.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ RNBRIDGE ══════════ -->
+<section class="section" id="bridge">
+  <div class="wrap">
+    <p class="eyebrow mono reveal"><span class="tick tick-magenta"></span>THE GDSCRIPT CONTRACT</p>
+    <h2 class="reveal">One AutoLoad. Two-way traffic.</h2>
+    <p class="lede reveal">
+      Add an AutoLoad singleton named <span class="mono hl-m">RNBridge</span> to your Godot project.
+      The C++ frame callback calls into it each frame — inbound messages in, outgoing queue drained out.
+    </p>
+
+    <figure class="code-block glass reveal code-wide">
+      <figcaption class="code-head mono"><span class="code-dots"><i></i><i></i><i></i></span>RNBridge.gd — AutoLoad singleton</figcaption>
+<pre class="mono"><code><span class="t-k">extends</span> <span class="t-o">Node</span>
+
+<span class="t-k">var</span> _outgoing_queue: <span class="t-o">Array</span>[<span class="t-o">String</span>] = []
+<span class="t-k">signal</span> <span class="t-fn">message_received</span>(data: <span class="t-o">String</span>)
+
+<span class="t-c"># ─── INCOMING (JS → Godot) — called by C++ each frame ───</span>
+<span class="t-k">func</span> <span class="t-fn">on_react_native_message</span>(payload: <span class="t-o">String</span>) -&gt; <span class="t-o">void</span>:
+    message_received.<span class="t-fn">emit</span>(payload)
+
+<span class="t-c"># ─── OUTGOING (Godot → JS) — drained into the SPSC ──────</span>
+<span class="t-k">func</span> <span class="t-fn">send_to_react_native</span>(msg: <span class="t-o">String</span>) -&gt; <span class="t-o">void</span>:
+    _outgoing_queue.<span class="t-fn">append</span>(msg)
+
+<span class="t-c"># ─── State sync (CQRS) ──────────────────────────────────</span>
+<span class="t-k">func</span> <span class="t-fn">sync_state_to_rn</span>(data: <span class="t-o">Dictionary</span>) -&gt; <span class="t-o">void</span>:
+    <span class="t-fn">send_to_react_native</span>(<span class="t-o">JSON</span>.<span class="t-fn">stringify</span>({ <span class="t-s">"type"</span>: <span class="t-s">"STATE_SYNC"</span>, <span class="t-s">"data"</span>: data }))</code></pre>
+    </figure>
+
+    <div class="bridge-flow mono reveal" aria-hidden="true">
+      <span class="bf bf-cyan">sendMessage()</span>
+      <span class="bf-arrow">──▶</span>
+      <span class="bf">inbound SPSC</span>
+      <span class="bf-arrow">──▶</span>
+      <span class="bf bf-magenta">on_react_native_message()</span>
+      <span class="bf-arrow bf-return">◀──</span>
+      <span class="bf">outbound SPSC</span>
+      <span class="bf-arrow bf-return">◀──</span>
+      <span class="bf bf-magenta">send_to_react_native()</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ BUILD ══════════ -->
+<section class="section section-tight" id="build">
+  <div class="wrap">
+    <div class="build-panel glass reveal">
+      <div>
+        <p class="eyebrow mono"><span class="tick"></span>OWN YOUR ENGINE</p>
+        <h2>Compile Godot from source.</h2>
+        <p>
+          No pre-built binary blobs. <span class="mono">build_godot.sh</span> downloads the pinned
+          <span class="mono">4.7-stable</span> source, applies version-pinned patches, compiles
+          <span class="mono">libgodot</span> for Android + iOS, and verifies the C-API symbols.
+        </p>
+      </div>
+      <figure class="code-block code-bare">
+<pre class="mono"><code><span class="t-fn">cd</span> engine_build && ./build_godot.sh
+<span class="t-c"># → libgodot.xcframework (iOS) + libgodot.so (Android)</span></code></pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER CTA ══════════ -->
+<section class="section outro" id="outro">
+  <div class="wrap outro-wrap">
+    <h2 class="outro-title reveal">Ship the whole engine.</h2>
+    <div class="hero-ctas reveal">
+      <a class="btn btn-primary magnetic" href="https://github.com/hung-yueh/react-native-nitro-godot" target="_blank" rel="noopener">Star on GitHub</a>
+      <a class="btn btn-ghost magnetic mono" href="https://www.npmjs.com/package/react-native-nitro-godot" target="_blank" rel="noopener">View on npm</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-wrap mono">
+    <span><span class="dot dot-cyan"></span><span class="dot dot-magenta"></span> react-native-nitro-godot · MIT</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/hung-yueh/react-native-nitro-godot/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+      <a href="https://github.com/hung-yueh/react-native-nitro-godot/blob/main/RNBRIDGE_SETUP.md" target="_blank" rel="noopener">RNBridge setup</a>
+      <a href="https://github.com/hung-yueh/react-native-nitro-godot/blob/main/engine_build/README.md" target="_blank" rel="noopener">Engine build</a>
+      <a href="https://github.com/hung-yueh/react-native-nitro-godot/issues" target="_blank" rel="noopener">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

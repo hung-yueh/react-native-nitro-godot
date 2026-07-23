@@ -47,6 +47,7 @@ prebuilt/
 # AI agent directories
 # ========================
 .gemini/
+.claude/
 
 # ========================
 # Expo / React Native
