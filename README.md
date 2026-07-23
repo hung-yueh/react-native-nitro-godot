@@ -200,7 +200,7 @@ For advanced manual lifecycle control:
 | `sendDragEvent(x, y, relX, relY, velX, velY, index)` | Forward a touch drag to Godot's `InputEventScreenDrag`.             |
 | `resizeSurface(w, h)`             | Updates Godot viewport + swapchain to match native surface dimensions.                     |
 | `getLastError(): string`          | Returns last critical engine error, or `""`. Check when Godot view is blank.               |
-| `destroy()`                       | Stop thread and call `libgodot_destroy_godot_instance()`.                                  |
+| `destroy()`                       | Stop and join the render thread; release the engine reference. The Godot instance is intentionally kept alive (process-wide singleton — it cannot be cleanly restarted). |
 
 ---
 

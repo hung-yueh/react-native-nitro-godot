@@ -12,6 +12,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<meta name="theme-color" content="#050508" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://hung-yueh.github.io/react-native-nitro-godot/" />
+<meta property="og:image" content="https://hung-yueh.github.io/react-native-nitro-godot/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="react-native-nitro-godot — the Godot Engine, inside React Native" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="canonical" href="https://hung-yueh.github.io/react-native-nitro-godot/" />
+<noscript><style>
+  /* main.js never ran: the overlay would otherwise cover the page forever
+     and every .reveal element would stay at opacity 0. */
+  .boot { display: none !important; }
+  .reveal { opacity: 1 !important; transform: none !important; clip-path: none !important; }
+</style></noscript>
 </head>
 <body>
 
@@ -59,7 +74,7 @@
   <div class="hero-content">
     <p class="eyebrow mono reveal">
       <span class="dot dot-cyan"></span> JS THREAD · 120 Hz
-      <span class="eyebrow-sep">⇄</span>
+      <span class="eyebrow-sep" aria-hidden="true">⇄</span>
       <span class="dot dot-magenta"></span> GODOT THREAD · 60 Hz
     </p>
     <h1 class="hero-title reveal">
@@ -144,42 +159,42 @@
 
     <div class="grid feat-grid">
       <article class="card glass reveal">
-        <div class="card-glyph mono">⟐</div>
+        <div class="card-glyph mono" aria-hidden="true">⟐</div>
         <h3>Zero vendor lock-in</h3>
         <p>Compile <span class="mono">libgodot</span> straight from official Godot source (pinned <span class="mono">4.7-stable</span>). Your C++ modules, your engine flags, your upgrade schedule.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">⇉</div>
+        <div class="card-glyph mono" aria-hidden="true">⇉</div>
         <h3>True zero-copy memory</h3>
         <p>Hand a 10&nbsp;MB <span class="mono">ArrayBuffer</span> — AI tensor output, mesh data — from JS to Godot's rendering device as a pointer. No serialization, no GC churn.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">◫</div>
+        <div class="card-glyph mono" aria-hidden="true">◫</div>
         <h3>Deterministic UI performance</h3>
         <p>Godot runs on its own <span class="mono">std::thread</span>. Under heavy 3D GPU load your React Native UI stays smooth at 120&nbsp;FPS — the threads can't stall each other.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">⚟</div>
+        <div class="card-glyph mono" aria-hidden="true">⚟</div>
         <h3>Event-driven messaging</h3>
         <p>No blind polling. A <span class="mono">rAF</span> drain loop wakes only when Godot enqueues — <span class="mono">setOnWakeUp()</span> replaces the busy-wait tax entirely.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">⌖</div>
+        <div class="card-glyph mono" aria-hidden="true">⌖</div>
         <h3>3D→2D projection at 120 Hz</h3>
         <p>Pin a React Native view over a 3D target with <span class="mono">unprojectPosition()</span> — cached camera matrices, pure math, safe inside Reanimated worklets.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">⛶</div>
+        <div class="card-glyph mono" aria-hidden="true">⛶</div>
         <h3>CQRS state sync</h3>
         <p>Godot is the authoritative server; Legend-State observables drive HUD updates at 60&nbsp;Hz+ with <strong>zero React re-renders</strong>. Send intents down, get <span class="mono">STATE_SYNC</span> back.</p>
       </article>
       <article class="card glass reveal">
-        <div class="card-glyph mono">☷</div>
+        <div class="card-glyph mono" aria-hidden="true">☷</div>
         <h3>Native touch forwarding</h3>
         <p>Touches enqueue lock-free and dispatch on the Godot thread through <span class="mono">Input.parse_input_event()</span> — Godot UI, physics, and drag all just work.</p>
       </article>
       <article class="card glyph-warn glass reveal">
-        <div class="card-glyph mono">☾</div>
+        <div class="card-glyph mono" aria-hidden="true">☾</div>
         <h3>OS lifecycle safety</h3>
         <p>Automatic suspend/resume on background/foreground with ghost-touch mitigation. No GPU-timeout crashes when the app leaves the screen.</p>
       </article>
@@ -201,11 +216,12 @@
         </p>
         <a class="btn btn-ghost btn-sm mono magnetic" href="https://github.com/hung-yueh/react-native-nitro-godot#-measuring-real-presented-fps" target="_blank" rel="noopener">Read the deep-dive →</a>
       </div>
-      <div class="fps-demo mono" aria-hidden="true">
+      <div class="fps-demo mono">
         <div class="fps-row"><span class="fps-key">producedFps</span><span class="fps-val c">40.1</span><span class="fps-note">// what a naive counter shows</span></div>
         <div class="fps-row"><span class="fps-key">presentedFps</span><span class="fps-val m">9.3</span><span class="fps-note">// what the user actually sees</span></div>
         <div class="fps-row"><span class="fps-key">worstFrameMs</span><span class="fps-val">216</span><span class="fps-note">// the jank you'd have missed</span></div>
         <div class="fps-src">engine.getFrameStats()</div>
+        <p class="fps-caveat">presentedFps is CADisplayLink-based and iOS-only today; it reads 0 on Android.</p>
       </div>
     </div>
   </div>
@@ -237,7 +253,8 @@
 
       <figure class="code-block glass reveal">
         <figcaption class="code-head mono"><span class="code-dots"><i></i><i></i><i></i></span>GameScreen.tsx</figcaption>
-<pre class="mono"><code><span class="t-k">import</span> { useGodotEngine, GodotView } <span class="t-k">from</span> <span class="t-s">"react-native-nitro-godot"</span>;
+<pre class="mono"><code><span class="t-k">import</span> { StyleSheet, View } <span class="t-k">from</span> <span class="t-s">"react-native"</span>;
+<span class="t-k">import</span> { useGodotEngine, GodotView } <span class="t-k">from</span> <span class="t-s">"react-native-nitro-godot"</span>;
 
 <span class="t-k">function</span> <span class="t-fn">GameScreen</span>() {
   <span class="t-k">const</span> { engineState, lastError, surfaceCallbacks,
@@ -277,7 +294,7 @@
           <div class="api-row"><code class="mono">start()</code><p>Spawn the render thread; the Godot main loop begins at ~60&nbsp;Hz.</p></div>
           <div class="api-row"><code class="mono">pause()</code><p>Pause the main loop without destroying engine state.</p></div>
           <div class="api-row"><code class="mono">suspendOS() / resumeOS(ptr)</code><p>Background/foreground handling — prevents GPU-timeout crashes.</p></div>
-          <div class="api-row"><code class="mono">destroy()</code><p>Stop the thread, then <span class="mono">libgodot_destroy_godot_instance()</span>.</p></div>
+          <div class="api-row"><code class="mono">destroy()</code><p>Stop and join the render thread and release the engine reference. The Godot instance is intentionally kept alive — it is a process-wide singleton that cannot be cleanly restarted.</p></div>
         </div>
       </div>
 
@@ -338,6 +355,13 @@
 <span class="t-c"># ─── OUTGOING (Godot → JS) — drained into the SPSC ──────</span>
 <span class="t-k">func</span> <span class="t-fn">send_to_react_native</span>(msg: <span class="t-o">String</span>) -&gt; <span class="t-o">void</span>:
     _outgoing_queue.<span class="t-fn">append</span>(msg)
+
+<span class="t-c"># Required: C++ calls this each frame to drain the queue.</span>
+<span class="t-c"># Without it, Godot → JS messages never arrive.</span>
+<span class="t-k">func</span> <span class="t-fn">poll_message</span>() -&gt; <span class="t-o">String</span>:
+    <span class="t-k">if</span> _outgoing_queue.<span class="t-fn">is_empty</span>():
+        <span class="t-k">return</span> <span class="t-s">""</span>
+    <span class="t-k">return</span> _outgoing_queue.<span class="t-fn">pop_front</span>()
 
 <span class="t-c"># ─── State sync (CQRS) ──────────────────────────────────</span>
 <span class="t-k">func</span> <span class="t-fn">sync_state_to_rn</span>(data: <span class="t-o">Dictionary</span>) -&gt; <span class="t-o">void</span>:

@@ -5,9 +5,17 @@
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* Storage throws (not just returns null) when site data is blocked —
+     Safari "Block all cookies", Chrome per-origin blocks, sandboxed iframes.
+     An uncaught throw here would abort this IIFE and strand the boot overlay. */
+  const store = {
+    get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch { /* non-fatal */ } },
+  };
+
   /* ── boot overlay ─────────────────────────────────────── */
   const boot = document.getElementById("boot");
-  if (boot && !reducedMotion && !sessionStorage.getItem("booted")) {
+  if (boot && !reducedMotion && !store.get("booted")) {
     const fill = document.getElementById("bootFill");
     const log = document.getElementById("bootLog");
     const lines = [
@@ -22,7 +30,7 @@
       fill.style.width = Math.min(step * 25, 100) + "%";
       if (log && lines[step]) log.textContent = lines[step];
       if (step < 4) setTimeout(tick, 260);
-      else setTimeout(() => { boot.classList.add("done"); sessionStorage.setItem("booted", "1"); }, 340);
+      else setTimeout(() => { boot.classList.add("done"); store.set("booted", "1"); }, 340);
     };
     setTimeout(tick, 220);
   } else if (boot) {
@@ -43,6 +51,14 @@
         if (!e.isIntersecting) continue;
         e.target.classList.add("in");
         io.unobserve(e.target);
+        /* Drop the stagger delay once the entrance has played — .reveal is
+           declared after .card, so a lingering --rd would delay card hover
+           by up to 450ms and suppress its border/shadow transition. */
+        e.target.addEventListener(
+          "transitionend",
+          () => e.target.style.removeProperty("--rd"),
+          { once: true }
+        );
       }
     }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
     // stagger siblings that reveal within the same parent

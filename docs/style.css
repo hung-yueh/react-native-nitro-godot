@@ -21,11 +21,12 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s6: 48px; --s8: 64px; --s12: 96px;
   --r: 14px;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; }
 
 body {
   background: var(--bg);
@@ -115,7 +116,7 @@ a { color: inherit; text-decoration: none; }
 }
 .btn-primary:hover { box-shadow: 0 0 44px rgba(0, 240, 255, 0.55), inset 0 0 0 1px rgba(255,255,255,0.35); }
 .btn-ghost {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(150, 165, 235, 0.42);
   background: rgba(255,255,255,0.02);
   color: var(--text);
 }
@@ -248,9 +249,9 @@ a { color: inherit; text-decoration: none; }
 .lane li { padding-left: 22px; position: relative; color: var(--text-dim); }
 .lane li.ok::before { content: "▸"; position: absolute; left: 0; color: var(--cyan); }
 .lane-godot li.ok::before { color: var(--magenta); }
-.lane li.no { color: #6a5560; text-decoration: line-through; text-decoration-color: rgba(255,45,149,0.5); }
+.lane li.no { color: #b09aa4; text-decoration: line-through; text-decoration-color: rgba(255,45,149,0.5); }
 .lane li.no::before { content: "✕"; position: absolute; left: 0; color: var(--magenta); }
-.lane-js li.no { color: #4d5f66; text-decoration-color: rgba(0,240,255,0.4); }
+.lane-js li.no { color: #93aab3; text-decoration-color: rgba(0,240,255,0.4); }
 .lane-js li.no::before { color: var(--cyan); }
 
 .lane-bridge {
@@ -290,6 +291,7 @@ a { color: inherit; text-decoration: none; }
   background: radial-gradient(400px circle at var(--mx, 50%) var(--my, 50%), rgba(0,240,255,0.08), transparent 45%);
   transition: opacity 0.35s; pointer-events: none;
 }
+.card.in { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.35s, box-shadow 0.35s; }
 .card:hover { transform: translateY(-4px); border-color: rgba(0, 240, 255, 0.28); box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 24px rgba(0,240,255,0.06); }
 .card:hover::before { opacity: 1; }
 .card-glyph {
@@ -320,8 +322,9 @@ a { color: inherit; text-decoration: none; }
 .fps-val { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
 .fps-val.c { color: var(--cyan); text-shadow: 0 0 12px rgba(0,240,255,0.5); }
 .fps-val.m { color: var(--magenta); text-shadow: 0 0 12px rgba(255,45,149,0.5); }
-.fps-note { font-size: 0.66rem; color: #565a70; margin-left: auto; }
+.fps-note { font-size: 0.66rem; color: #8a8fa8; margin-left: auto; }
 .fps-src { margin-top: var(--s2); padding-top: var(--s2); border-top: 1px dashed var(--line); font-size: 0.7rem; color: var(--purple); }
+.fps-caveat { margin-top: 10px; font-size: 0.66rem; color: #8a8fa8; line-height: 1.5; }
 
 /* ── code blocks ──────────────────────────────────────── */
 .code-cols { display: grid; grid-template-columns: minmax(280px, 0.8fr) 1.2fr; gap: var(--s2); align-items: start; }
@@ -344,7 +347,7 @@ a { color: inherit; text-decoration: none; }
 /* token colors */
 .t-k  { color: var(--magenta); }
 .t-s  { color: #a7f3d0; }
-.t-c  { color: #565a70; font-style: italic; }
+.t-c  { color: #8a8fa8; font-style: italic; }
 .t-fn { color: var(--cyan); }
 .t-o  { color: var(--purple); }
 .t-m  { color: var(--magenta); }
@@ -439,6 +442,10 @@ a { color: inherit; text-decoration: none; }
   .hero .eyebrow { font-size: 0.6rem; letter-spacing: 0.14em; gap: 6px; }
 }
 
+@media (forced-colors: active) {
+  .grad, .stat-n { -webkit-text-fill-color: currentColor; background: none; color: CanvasText; }
+}
+
 /* ── accessibility ────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 4px; }
 
@@ -447,5 +454,6 @@ a { color: inherit; text-decoration: none; }
   .reveal { opacity: 1; transform: none; clip-path: none; transition: none; }
   .bridge-pipe::after, .scroll-line, .boot-rings span { animation: none; }
   .boot { display: none; }
-  .card, .btn { transition: none; }
+  .card, .card.in, .btn, .nav, .nav-links a, .api-row { transition: none; }
+  .card::before { transition: none; }
 }
