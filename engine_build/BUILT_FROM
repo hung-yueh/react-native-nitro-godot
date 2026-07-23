@@ -1,0 +1,5 @@
+# Provenance of the binaries in prebuilt/ — written by build_godot.sh.
+# Regenerated on every successful build; commit alongside releases.
+version=4.7-stable
+commit=5b4e0cb0fd279832bbdd69fed5354d4e5ad26f88
+built_at=2026-07-23T22:15:05Z

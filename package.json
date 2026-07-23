@@ -34,7 +34,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "nitrogen": "npx nitrogen",
-    "prepack": "npx nitrogen && bob build",
+    "check:prebuilt": "bash scripts/check-prebuilt-version.sh",
+    "prepack": "bash scripts/check-prebuilt-version.sh && npx nitrogen && bob build",
     "prepare": "bob build",
     "release": "release-it",
     "release:first": "release-it --no-increment"

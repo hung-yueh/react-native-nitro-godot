@@ -619,6 +619,19 @@ fi
 echo ""
 echo "============================================================"
 if [[ "$GATE_ERRORS" -eq 0 ]]; then
+    # Record build provenance in a git-TRACKED file. prebuilt/ itself is
+    # gitignored (npm ships it via the package.json "files" whitelist), so
+    # without this there is no record in the repo of which engine commit the
+    # shipped binaries came from.
+    BUILT_FROM_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/BUILT_FROM"
+    {
+        echo "# Provenance of the binaries in prebuilt/ — written by build_godot.sh."
+        echo "# Regenerated on every successful build; commit alongside releases."
+        echo "version=$GODOT_VERSION"
+        echo "commit=${GODOT_COMMIT:-<tag>}"
+        echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    } > "$BUILT_FROM_FILE"
+    log_ok "Provenance → $BUILT_FROM_FILE"
     echo -e "  ${GREEN}${BOLD}All verification gates passed. Build successful!${NC}"
     echo ""
     echo "  Outputs:"
