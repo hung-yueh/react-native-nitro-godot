@@ -46,3 +46,30 @@ for BIN in "${BINARIES[@]}"; do
 done
 
 echo "✓ prebuilt/ matches pinned $PIN"
+
+# ── Shipped headers must actually compile ────────────────────────────────────
+# The binary check above says nothing about prebuilt/include. 0.1.6 passed this
+# gate and still shipped un-compilable: libgodot.h includes its companion by the
+# Godot in-tree path ("core/extension/gdextension_interface.gen.h") while the
+# header was staged flat, so the include resolved nowhere.
+#
+# A mere existence check would NOT have caught that. Compile a translation unit
+# exactly the way a consumer does — include the entry header with prebuilt/include
+# as the ONLY search root (matching react-native-nitro-godot.podspec and
+# android/CMakeLists.txt) — so any unresolvable include fails the publish.
+INCLUDE_DIR="$ROOT/prebuilt/include"
+[[ -d "$INCLUDE_DIR" ]] || die "missing $INCLUDE_DIR (run scripts/stage-prebuilt-headers.sh)"
+
+CC_BIN="${CC:-cc}"
+command -v "$CC_BIN" >/dev/null || die "no C compiler ('$CC_BIN') available to verify shipped headers"
+
+TMP_SRC="$(mktemp -t libgodot_header_check.XXXXXX).c"
+trap 'rm -f "$TMP_SRC" "${TMP_SRC%.c}"' EXIT
+echo '#include "libgodot.h"' > "$TMP_SRC"
+
+if ! ERR=$("$CC_BIN" -fsyntax-only -I "$INCLUDE_DIR" "$TMP_SRC" 2>&1); then
+  echo "$ERR" >&2
+  die "prebuilt/include does not compile standalone — a shipped header includes something that is not in prebuilt/include. Run scripts/stage-prebuilt-headers.sh and re-check."
+fi
+
+echo "✓ prebuilt/include compiles standalone (#include \"libgodot.h\")"

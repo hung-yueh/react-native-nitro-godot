@@ -632,6 +632,23 @@ if [[ "$GATE_ERRORS" -eq 0 ]]; then
         echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     } > "$BUILT_FROM_FILE"
     log_ok "Provenance → $BUILT_FROM_FILE"
+
+    # Stage the public headers into prebuilt/include from the tree we just built,
+    # so they always match these binaries. This used to be a manual copy, and
+    # copying them flat is what shipped 0.1.6 un-compilable (libgodot.h includes
+    # its companion by the in-tree path "core/extension/...").
+    STAGE_HEADERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/stage-prebuilt-headers.sh"
+    if [[ -x "$STAGE_HEADERS" ]]; then
+        if bash "$STAGE_HEADERS"; then
+            log_ok "Headers staged → prebuilt/include"
+        else
+            log_fail "Header staging failed — prebuilt/include does not match these binaries"
+            exit 1
+        fi
+    else
+        log_warn "scripts/stage-prebuilt-headers.sh not found — stage prebuilt/include manually"
+    fi
+
     echo -e "  ${GREEN}${BOLD}All verification gates passed. Build successful!${NC}"
     echo ""
     echo "  Outputs:"
