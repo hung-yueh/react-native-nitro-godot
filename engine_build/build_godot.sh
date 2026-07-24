@@ -639,7 +639,12 @@ if [[ "$GATE_ERRORS" -eq 0 ]]; then
     # its companion by the in-tree path "core/extension/...").
     STAGE_HEADERS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/stage-prebuilt-headers.sh"
     if [[ -x "$STAGE_HEADERS" ]]; then
-        bash "$STAGE_HEADERS" && log_ok "Headers staged → prebuilt/include"
+        if bash "$STAGE_HEADERS"; then
+            log_ok "Headers staged → prebuilt/include"
+        else
+            log_fail "Header staging failed — prebuilt/include does not match these binaries"
+            exit 1
+        fi
     else
         log_warn "scripts/stage-prebuilt-headers.sh not found — stage prebuilt/include manually"
     fi

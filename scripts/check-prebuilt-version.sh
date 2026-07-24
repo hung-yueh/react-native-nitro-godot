@@ -64,7 +64,7 @@ CC_BIN="${CC:-cc}"
 command -v "$CC_BIN" >/dev/null || die "no C compiler ('$CC_BIN') available to verify shipped headers"
 
 TMP_SRC="$(mktemp -t libgodot_header_check.XXXXXX).c"
-trap 'rm -f "$TMP_SRC"' EXIT
+trap 'rm -f "$TMP_SRC" "${TMP_SRC%.c}"' EXIT
 echo '#include "libgodot.h"' > "$TMP_SRC"
 
 if ! ERR=$("$CC_BIN" -fsyntax-only -I "$INCLUDE_DIR" "$TMP_SRC" 2>&1); then
