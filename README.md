@@ -200,7 +200,18 @@ For advanced manual lifecycle control:
 | `sendDragEvent(x, y, relX, relY, velX, velY, index)` | Forward a touch drag to Godot's `InputEventScreenDrag`.             |
 | `resizeSurface(w, h)`             | Updates Godot viewport + swapchain to match native surface dimensions.                     |
 | `getLastError(): string`          | Returns last critical engine error, or `""`. Check when Godot view is blank.               |
-| `destroy()`                       | Stop and join the render thread; release the engine reference. The Godot instance is intentionally kept alive (process-wide singleton — it cannot be cleanly restarted). |
+| `destroy()`                       | Hard teardown: stop and join the render thread and forget the shared engine. Godot cannot be started again in this process afterwards — only for shutting the game down for good. |
+
+### Remounts, Fast Refresh and the shared engine
+
+Godot is a process-wide singleton and cannot be re-created after it has started, so the wrapper
+keeps **one shared engine per process**: every `createGodotEngine()` call after the first returns
+the same wrapper. `useGodotEngine` releases the engine on unmount (`release()` → `suspendOS()`,
+native instance kept) and a later mount adopts it and resumes on the new surface via `resumeOS()`.
+That makes React remounts of `<GodotView>` and Fast Refresh of the components around it work
+without a black view. Two limits remain: a full JS reload (⌘R) creates a new JS runtime but the
+native engine is still running — reload the app to restart Godot — and the engine cannot switch
+to a different `.pck` in the same process (a warning is logged and the running engine is reused).
 
 ---
 
@@ -443,6 +454,12 @@ PROC TEST: All 16 checks passed ✓
    | `Missing GDExtension procs` | stale libgodot binary | Rebuild engine: `cd engine_build && ./build_godot.sh` |
    | `Failed to set up Android JNI context` | JNI environment error | Ensure React Native activity is running |
    | Crash on startup + `RendererCompositor singleton` | Double init (iOS) | Check for multiple `GodotView` mounts |
+   | `Could not find base class "…"` for a class the editor has | The shipped libgodot is built with some SCons features disabled | Since 0.1.10 the advanced GUI nodes (`SubViewportContainer`, `RichTextLabel`, `PopupMenu`, `Tree`, …) are included; `disable_3d` stays off. `disable_2d` was never a real Godot option. If you build your own engine, check `engine_build/build_godot.sh` |
+
+4. **Read Godot's own errors.** Script parse errors, `SCRIPT ERROR` lines and `push_error()` output from the
+   embedded engine are written to the app's stderr, so they show up in the `expo run:ios` / Metro log
+   (`grep -E "SCRIPT ERROR|Parse Error"`). A pack that runs fine under the desktop editor binary with
+   `--main-pack` but fails on device usually fails to *parse* a script there — check that log first.
 
 ### Build Errors
 

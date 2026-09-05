@@ -15,6 +15,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { GodotView } from 'react-native-nitro-godot';
 import App from '../App';
 import { resetRAF } from '../../../src/__tests__/testUtils';
+import { __resetSharedGodotEngineForTests } from '../../../src/GodotEngine';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ function rawEngineMock() {
 beforeEach(() => {
   resetRAF();
   jest.clearAllMocks();
+  __resetSharedGodotEngineForTests();
 });
 
 describe('App', () => {

@@ -77,6 +77,8 @@ export interface UseGodotEngineResult {
  *   3. attachSurface() + start() + wire SPSC polling
  *
  * Automatically handles:
+ *   - Remount / Fast Refresh: the shared engine is reused; unmount releases
+ *     (suspends) it instead of destroying it, and the next surface resumes it
  *   - AppState background/foreground → suspendOS() / resumeOS()
  *   - Ghost touch release on background (synthetic "up" for all active pointers)
  *   - Surface hot-swap (surfaceDestroyed → surfaceCreated cycle)
@@ -106,15 +108,17 @@ export function useGodotEngine(
   const engineRef = useRef<GodotEngineWrapper | null>(null);
   const surfacePtrRef = useRef<bigint | null>(null);
   const activeTouchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const [engineState, setEngineState] = useState<EngineState>('idle');
-  const [lastError, setLastError] = useState<string | null>(null);
 
-  // Lazy initialization — create engine once
+  // Lazy initialization — create the engine once per mount. createGodotEngine()
+  // returns the process-wide shared engine when one already exists (remount,
+  // Fast Refresh), in which case it was started earlier and only needs a
+  // surface: start in 'suspended' so onSurfaceCreated takes the resumeOS path.
   if (!engineRef.current) {
     engineRef.current = createGodotEngine(pckPath);
-    setEngineState('initializing');
   }
   const engine = engineRef.current;
+  const [engineState, setEngineState] = useState<EngineState>(() => (engine.started ? 'suspended' : 'initializing'));
+  const [lastError, setLastError] = useState<string | null>(null);
 
   // ── Core lifecycle effect ──────────────────────────────────────────────────
   useEffect(() => {
@@ -160,7 +164,9 @@ export function useGodotEngine(
       engine.stopPolling();
       unsubStateSync();
       unsubConsumer?.();
-      engine.destroy();
+      // Transient unmount: keep the native engine alive for the next mount.
+      // (Godot cannot be restarted in-process — see ARCHITECTURE.md §8.1.)
+      engine.release();
       engineRef.current = null;
       surfacePtrRef.current = null;
       activeTouchesRef.current.clear();
@@ -211,6 +217,7 @@ export function useGodotEngine(
     // engine; attachSurface() alone is only consumed by the initial start().
     if (engineState === 'initializing' || engineState === 'idle') {
       engine.raw.start();
+      engine.markStarted();
       setEngineState('running');
     } else if (engineState === 'suspended' || engineState === 'running') {
       engine.raw.resumeOS(ptr);

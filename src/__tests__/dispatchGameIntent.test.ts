@@ -26,6 +26,10 @@ function createMockWrapper(): GodotEngineWrapper & { _sentMessages: string[] } {
     resumeOS: jest.fn(),
     notifyPollingStopped: jest.fn(),
     getFrameStats: jest.fn(() => ({ producedFps: 0, presentedFps: 0, worstFrameMs: 0 })),
+    pckPath: '/test/game.pck',
+    started: false,
+    markStarted: jest.fn(),
+    release: jest.fn(),
     destroy: jest.fn(),
   };
 }

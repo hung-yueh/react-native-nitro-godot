@@ -25,6 +25,15 @@ export interface GodotEngineWrapper {
   /** The raw Nitro HybridObject — use for direct JSI calls */
   readonly raw: GodotEngineSpec;
 
+  /** The .pck this engine was initialized with */
+  readonly pckPath: string;
+
+  /** True once start() has been issued through {@link markStarted}. */
+  readonly started: boolean;
+
+  /** Record that the engine has been started (called by useGodotEngine after raw.start()). */
+  markStarted(): void;
+
   /** Register a handler for messages from Godot */
   onMessage(handler: MessageHandler): () => void;
 
@@ -61,8 +70,39 @@ export interface GodotEngineWrapper {
    */
   getFrameStats(): FrameStats;
 
-  /** Destroy the engine and clean up */
+  /**
+   * Soft release for a transient unmount (tab switch, Fast Refresh, remount):
+   * stops the drain loop, drops message handlers and suspends the engine, but
+   * keeps the native instance alive and registered so the next
+   * {@link createGodotEngine} call adopts it and resumes on the new surface.
+   * Godot cannot be re-created in-process, so this is the only path that
+   * survives a React remount.
+   */
+  release(): void;
+
+  /**
+   * Hard teardown: stops and joins the render thread and forgets the shared
+   * instance. After this, Godot cannot be started again in this process —
+   * only call it when the app is shutting the game down for good.
+   */
   destroy(): void;
+}
+
+// ── Process-wide shared engine ────────────────────────────────────────────
+// Godot is a process singleton (see ARCHITECTURE.md §8.1). Every
+// createGodotEngine() call after the first returns the same wrapper so that
+// React remounts and Fast Refresh reuse the live engine instead of trying to
+// start a second one.
+let sharedEngine: GodotEngineWrapper | null = null;
+
+/** The engine created earlier in this process, if any. */
+export function getSharedGodotEngine(): GodotEngineWrapper | null {
+  return sharedEngine;
+}
+
+/** @internal Test-only: forget the shared engine without touching native. */
+export function __resetSharedGodotEngineForTests(): void {
+  sharedEngine = null;
 }
 
 /**
@@ -72,12 +112,23 @@ export interface GodotEngineWrapper {
  * @returns GodotEngineWrapper with lifecycle management and message handling
  */
 export function createGodotEngine(pckPath: string): GodotEngineWrapper {
+  if (sharedEngine) {
+    if (sharedEngine.pckPath !== pckPath) {
+      console.warn(
+        `[GodotEngine] createGodotEngine("${pckPath}") — reusing the engine already running "${sharedEngine.pckPath}". ` +
+          'Godot cannot load a second pack in this process; restart the app to switch packs.',
+      );
+    }
+    return sharedEngine;
+  }
+
   const engine = NitroModules.createHybridObject<GodotEngineSpec>('GodotEngine');
   engine.initialize(pckPath);
 
   const handlers = new Set<MessageHandler>();
   let rafId: number | null = null;
   let isPolling = false;
+  let started = false;
 
   // ── rAF Drain Loop ──────────────────────────────────────────────────────
   // Drains all pending messages from the SPSC queue, dispatches to handlers,
@@ -130,9 +181,19 @@ export function createGodotEngine(pckPath: string): GodotEngineWrapper {
 
   // ── Public API ──────────────────────────────────────────────────────────
 
-  return {
+  const wrapper: GodotEngineWrapper = {
     get raw() {
       return engine;
+    },
+
+    pckPath,
+
+    get started() {
+      return started;
+    },
+
+    markStarted() {
+      started = true;
     },
 
     onMessage(handler: MessageHandler): () => void {
@@ -181,10 +242,22 @@ export function createGodotEngine(pckPath: string): GodotEngineWrapper {
       return engine.getFrameStats();
     },
 
+    release() {
+      stopDrainLoop();
+      handlers.clear();
+      // suspendOS() pauses the SceneTree, disables the render loop and mutes
+      // audio; resumeOS(newSurface) from the next mount undoes all of it.
+      if (started) engine.suspendOS();
+    },
+
     destroy() {
       stopDrainLoop();
       handlers.clear();
       engine.destroy();
+      if (sharedEngine === wrapper) sharedEngine = null;
     },
   };
+
+  sharedEngine = wrapper;
+  return wrapper;
 }
