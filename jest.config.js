@@ -18,6 +18,10 @@ module.exports = {
         module: 'commonjs',
         moduleResolution: 'node',
         jsx: 'react',
+        // Example-app sources import the library by its package name; map it
+        // to source for type resolution (moduleNameMapper covers runtime).
+        baseUrl: '.',
+        paths: { 'react-native-nitro-godot': ['./src/index.ts'] },
       },
     }],
   },

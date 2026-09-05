@@ -203,7 +203,7 @@ export function unproject3DToScreen(
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 
   // Score bar at the top
