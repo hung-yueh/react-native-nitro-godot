@@ -73,16 +73,25 @@ TMP_DIR="/data/local/tmp"
 echo "  Pushing test harness and libgodot.so to $TMP_DIR..."
 adb push "$TEST_BIN" "$TMP_DIR/dlopen_test" > /dev/null
 adb push "$SO_PATH" "$TMP_DIR/libgodot.so" > /dev/null
+# libgodot.so is linked against the NDK's shared C++ runtime. A real app ships
+# libc++_shared.so inside the APK; this bare harness has to push it alongside
+# and point the loader at it, or dlopen fails with "libc++_shared.so not found".
+LIBCXX_SHARED=$(find "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt" -path "*aarch64-linux-android/libc++_shared.so" -print -quit)
+if [[ -z "$LIBCXX_SHARED" ]]; then
+    echo -e "  ${RED}✗ libc++_shared.so not found under $ANDROID_NDK_ROOT${NC}"
+    exit 1
+fi
+adb push "$LIBCXX_SHARED" "$TMP_DIR/libc++_shared.so" > /dev/null
 adb shell chmod +x "$TMP_DIR/dlopen_test"
 
 echo "  Executing test on device..."
 set +e
-adb shell "$TMP_DIR/dlopen_test $TMP_DIR/libgodot.so"
+adb shell "LD_LIBRARY_PATH=$TMP_DIR $TMP_DIR/dlopen_test $TMP_DIR/libgodot.so"
 ADB_EC=$?
 set -e
 
 echo "  Cleaning up device..."
-adb shell rm "$TMP_DIR/dlopen_test" "$TMP_DIR/libgodot.so"
+adb shell rm "$TMP_DIR/dlopen_test" "$TMP_DIR/libgodot.so" "$TMP_DIR/libc++_shared.so"
 
 if [[ "$ADB_EC" -eq 0 ]]; then
     echo -e "  ${GREEN}✓ JNI Smoke Test Passed on device.${NC}"

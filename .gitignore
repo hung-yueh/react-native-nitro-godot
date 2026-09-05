@@ -32,6 +32,7 @@ DerivedData/
 engine_build/godot-src/
 engine_build/output/
 engine_build/tmp_apk/
+engine_build/tests/03_android_dlopen/build/
 engine_build/*.tar.gz
 engine_build/*.zip
 engine_build/build_log.txt

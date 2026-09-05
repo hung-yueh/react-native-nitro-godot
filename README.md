@@ -83,7 +83,7 @@ All cross-thread data flows through lock-free SPSC queues or atomic double-buffe
 | React Native  | >= 0.73           |
 | Expo          | >= 55 (optional)  |
 | Nitro Modules | >= 0.35.0         |
-| Godot Engine  | 4.7-stable (pinned) |
+| Godot Engine  | 4.7.2-stable (pinned) |
 | Android NDK   | >= 27             |
 
 ### Optional Peer Dependencies
@@ -341,7 +341,7 @@ engine.dispose();
 
 ## 🛠 Building Godot from Source
 
-Unlike other solutions, `react-native-nitro-godot` does not restrict you to pre-built binaries. You must compile Godot as a library directly from the pinned version (**4.7-stable**). The provided `build_godot.sh` handles downloading, patching, compiling, and verification.
+Unlike other solutions, `react-native-nitro-godot` does not restrict you to pre-built binaries. You must compile Godot as a library directly from the pinned version (**4.7.2-stable**). The provided `build_godot.sh` handles downloading, patching, compiling, and verification.
 
 See [`engine_build/README.md`](engine_build/README.md) and [`engine_build/patches/README.md`](engine_build/patches/README.md) for details.
 

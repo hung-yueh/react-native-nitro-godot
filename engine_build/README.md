@@ -2,7 +2,7 @@
 
 Automated pipeline to download, patch, and compile **Godot 4.x** as an optimised shared library for Android and iOS, for use as the native engine backend in a React Native Nitro module.
 
-The Godot version is pinned in the [`GODOT_VERSION`](./GODOT_VERSION) file (currently **4.7.1-stable**).
+The Godot version is pinned in the [`GODOT_VERSION`](./GODOT_VERSION) file (currently **4.7.2-stable**).
 
 ---
 
@@ -116,11 +116,11 @@ To upgrade the Godot engine version:
 # 1. Find the source commit for the target build. Pre-release tags
 #    (dev/beta/rc) live in the godotengine/godot-builds repo, NOT the main
 #    source repo — the release notes list the source commit:
-#      https://github.com/godotengine/godot/releases/tag/4.7.1-stable
+#      https://github.com/godotengine/godot/releases/tag/4.7.2-stable
 #      → "Built from commit <SHA>"
 
 # 2. Pin both the version label and that commit (format: VERSION COMMIT_HASH).
-echo "4.7.1-stable a13da4feb8d8aefc283c3763d33a2f170a18d541" > engine_build/GODOT_VERSION
+echo "4.7.2-stable ed1daf0bf001b61586d9930840f2f1394092c079" > engine_build/GODOT_VERSION
 
 # 3. Rebuild (stale source is auto-detected and re-downloaded; the build
 #    exports GODOT_VERSION_STATUS, e.g. "rc2", so the engine self-identifies).
