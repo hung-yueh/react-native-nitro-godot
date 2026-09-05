@@ -207,8 +207,13 @@ disable_path_overrides = "no"
 use_volk = "yes"
 
 # Disable rendering sub-systems not needed for a headless/GDExtension use case
-disable_2d = "yes"
-disable_advanced_gui = "yes"
+# Keep the advanced GUI nodes. disable_advanced_gui=yes strips SubViewportContainer,
+# RichTextLabel, PopupMenu, OptionButton, SpinBox, SplitContainer, Tree, TextEdit,
+# GraphEdit and friends — a script that merely `extends` one of them fails to parse
+# on device with "Could not find base class", while the editor binary (which has
+# them) cannot reproduce it. Size cost is a few MB; correctness wins for a
+# general-purpose embedding library.
+disable_advanced_gui = "no"
 
 # Disable unused built-in modules to shrink the binary
 module_physics_2d_enabled = "no"

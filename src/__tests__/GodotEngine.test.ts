@@ -1,3 +1,4 @@
+import { createGodotEngine, getSharedGodotEngine } from '../GodotEngine';
 /**
  * GodotEngine.test.ts — Tests for engine wrapper message handling
  *
@@ -125,6 +126,54 @@ describe('createGodotEngine', () => {
     const { wrapper, mockRaw } = createTestEngine();
     wrapper.sendMessage('hello');
     expect(mockRaw.sendMessage).toHaveBeenCalledWith('hello');
+  });
+
+  describe('shared engine', () => {
+    test('createGodotEngine returns the same wrapper for the process', () => {
+      const { wrapper, mockRaw } = createTestEngine('/a.pck');
+      const again = createGodotEngine('/a.pck');
+      expect(again).toBe(wrapper);
+      expect(mockRaw.initialize).toHaveBeenCalledTimes(1);
+      expect(getSharedGodotEngine()).toBe(wrapper);
+    });
+
+    test('a different pck path warns and still reuses the running engine', () => {
+      const { wrapper } = createTestEngine('/a.pck');
+      const warn = jest.spyOn(console, 'warn').mockImplementation();
+      expect(createGodotEngine('/b.pck')).toBe(wrapper);
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    test('release suspends a started engine, stops polling, drops handlers, keeps it shared', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      const received: string[] = [];
+      wrapper.onMessage((m) => received.push(m));
+      wrapper.startPolling();
+      wrapper.markStarted();
+
+      wrapper.release();
+
+      expect(mockRaw.suspendOS).toHaveBeenCalledTimes(1);
+      expect(mockRaw.destroy).not.toHaveBeenCalled();
+      mockRaw._enqueueTestMessage('late');
+      flushRAF();
+      expect(received).toEqual([]);
+      expect(getSharedGodotEngine()).toBe(wrapper);
+      expect(wrapper.started).toBe(true);
+    });
+
+    test('release on a never-started engine does not touch native', () => {
+      const { wrapper, mockRaw } = createTestEngine();
+      wrapper.release();
+      expect(mockRaw.suspendOS).not.toHaveBeenCalled();
+    });
+
+    test('destroy forgets the shared engine so a new one can be created', () => {
+      const { wrapper } = createTestEngine();
+      wrapper.destroy();
+      expect(getSharedGodotEngine()).toBeNull();
+    });
   });
 
   test('destroy stops drain loop and clears handlers', () => {

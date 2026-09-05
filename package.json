@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-godot",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "React Native Nitro Module for Godot Engine integration via libgodot",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

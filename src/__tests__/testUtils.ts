@@ -9,7 +9,7 @@
  * into individual test files.
  */
 
-import { createGodotEngine } from '../GodotEngine';
+import { createGodotEngine, __resetSharedGodotEngineForTests } from '../GodotEngine';
 import { createMockEngine } from './__mocks__/react-native-nitro-modules';
 
 let rafCallbacks: Array<() => void> = [];
@@ -36,6 +36,7 @@ export function flushRAF() {
 
 /** Create an engine wrapper bound to a fresh mock HybridObject */
 export function createTestEngine(pckPath = '/test/game.pck') {
+  __resetSharedGodotEngineForTests();
   const mockRaw = createMockEngine();
 
   // Monkey-patch NitroModules to return our mock

@@ -16,7 +16,7 @@ export type { GodotViewProps, SurfaceCreatedEvent, SurfaceChangedEvent, TouchEve
 export { useGodotEngine } from './useGodotEngine';
 export type { UseGodotEngineResult, EngineState } from './useGodotEngine';
 
-export { createGodotEngine } from './GodotEngine';
+export { createGodotEngine, getSharedGodotEngine } from './GodotEngine';
 export type { GodotEngineWrapper, MessageHandler } from './GodotEngine';
 
 // ── Nitro Spec (for advanced use / direct JSI access) ─────────────────

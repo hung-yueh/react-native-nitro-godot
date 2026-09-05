@@ -8,7 +8,8 @@
  *     round-trip used to leave the fresh surface unattached → black view)
  *   - suspend on background (with ghost-touch release), resume on foreground
  *   - ENGINE_ERROR message → engineState 'error' + lastError
- *   - unmount → destroy()
+ *   - unmount → release() (suspend, keep native alive), remount reuses the
+ *     engine and resumes on the new surface without a second start()
  */
 
 import React from 'react';
@@ -17,6 +18,7 @@ import { AppState } from 'react-native';
 import { useGodotEngine, type UseGodotEngineResult } from '../useGodotEngine';
 import { createMockEngine } from './__mocks__/react-native-nitro-modules';
 import { flushRAF, resetRAF } from './testUtils';
+import { __resetSharedGodotEngineForTests } from '../GodotEngine';
 
 // The hook ingests STATE_SYNC into godotState — isolate that dependency.
 jest.mock('../godotState', () => ({
@@ -29,19 +31,21 @@ jest.mock('../godotState', () => ({
 function renderHook(pckPath = '/test/game.pck') {
   const result: { current: UseGodotEngineResult } = { current: null as any };
 
-  function Harness() {
-    result.current = useGodotEngine(pckPath);
+  function Harness({ path }: { path: string }) {
+    result.current = useGodotEngine(path);
     return null;
   }
 
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
-    renderer = TestRenderer.create(<Harness />);
+    renderer = TestRenderer.create(<Harness path={pckPath} />);
   });
 
   return {
     result,
     unmount: () => act(() => renderer.unmount()),
+    /** Re-render the same mounted hook with a different pck path */
+    rerender: (path: string) => act(() => renderer.update(<Harness path={path} />)),
   };
 }
 
@@ -67,6 +71,7 @@ function appStateHandler(): (next: string) => void {
 beforeEach(() => {
   resetRAF();
   jest.clearAllMocks();
+  __resetSharedGodotEngineForTests();
 });
 
 describe('useGodotEngine (mounted)', () => {
@@ -246,12 +251,82 @@ describe('useGodotEngine (mounted)', () => {
     expect(mockRaw.sendDragEvent).toHaveBeenCalledWith(110, 95, 10, -5, 0, 0, 0);
   });
 
-  test('unmount destroys the engine and stops polling', () => {
+  test('unmount releases the engine (suspends it, never destroys it)', () => {
+    const mockRaw = primeMockEngine();
+    const { result, unmount } = renderHook();
+    act(() => {
+      result.current.surfaceCallbacks.onSurfaceCreated(surfaceEvent('42'));
+    });
+
+    unmount();
+
+    expect(mockRaw.suspendOS).toHaveBeenCalled();
+    expect(mockRaw.destroy).not.toHaveBeenCalled();
+  });
+
+  test('unmount before the first surface does not suspend a never-started engine', () => {
     const mockRaw = primeMockEngine();
     const { unmount } = renderHook();
 
     unmount();
 
-    expect(mockRaw.destroy).toHaveBeenCalled();
+    expect(mockRaw.suspendOS).not.toHaveBeenCalled();
+    expect(mockRaw.destroy).not.toHaveBeenCalled();
+  });
+
+  test('a pckPath change without remount suspends then resumes on the retained surface', () => {
+    const mockRaw = primeMockEngine();
+    const { result, rerender } = renderHook('/a.pck');
+    act(() => {
+      result.current.surfaceCallbacks.onSurfaceCreated(surfaceEvent('42'));
+    });
+    expect(result.current.engineState).toBe('running');
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+
+    // Metro re-hashed the pack asset → new extracted path → effect re-runs.
+    rerender('/b.pck');
+
+    expect(mockRaw.suspendOS).toHaveBeenCalledTimes(1);          // cleanup released it
+    expect(mockRaw.resumeOS).toHaveBeenCalledWith(BigInt(42));   // effect re-run resumed it
+    expect(mockRaw.start).toHaveBeenCalledTimes(1);              // never restarted
+    expect(mockRaw.destroy).not.toHaveBeenCalled();
+    expect(result.current.engineState).toBe('running');
+    warn.mockRestore();
+  });
+
+  test('remount reuses the shared engine and resumes on the new surface without start()', () => {
+    const mockRaw = primeMockEngine();
+    const first = renderHook();
+    act(() => {
+      first.result.current.surfaceCallbacks.onSurfaceCreated(surfaceEvent('42'));
+    });
+    expect(mockRaw.start).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    // Second mount (Fast Refresh / navigation back): NitroModules must NOT be
+    // asked for a new HybridObject and start() must not run again.
+    const NitroModules = require('react-native-nitro-modules').NitroModules;
+    const createCalls = (NitroModules.createHybridObject as jest.Mock).mock.calls.length;
+    const second = renderHook();
+    expect((NitroModules.createHybridObject as jest.Mock).mock.calls.length).toBe(createCalls);
+    expect(second.result.current.engine.raw).toBe(mockRaw);
+    expect(second.result.current.engineState).toBe('suspended');
+
+    act(() => {
+      second.result.current.surfaceCallbacks.onSurfaceCreated(surfaceEvent('99'));
+    });
+    expect(mockRaw.start).toHaveBeenCalledTimes(1);
+    expect(mockRaw.resumeOS).toHaveBeenCalledWith(BigInt(99));
+    expect(second.result.current.engineState).toBe('running');
+
+    // Messages flow to the new mount's handlers.
+    const received: string[] = [];
+    second.result.current.engine.onMessage((m) => received.push(m));
+    act(() => {
+      mockRaw._enqueueTestMessage('{"type":"PONG"}');
+      flushRAF();
+    });
+    expect(received).toEqual(['{"type":"PONG"}']);
+    second.unmount();
   });
 });

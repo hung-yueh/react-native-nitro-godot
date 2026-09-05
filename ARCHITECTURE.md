@@ -159,7 +159,9 @@ These are deliberately-scoped items that require on-device compilation and itera
 
 The Godot instance is a process-wide singleton that is intentionally never destroyed (`Main::cleanup()` cannot fully reset Godot's global state). The render thread, however, is owned per-`HybridGodotEngine` object and is joined on `destroy()`. After a remount (e.g. Expo Fast Refresh), `start()` takes the reuse branch — which now re-points `g_engine` and re-adopts the live GDExtension state, but does **not** re-spawn the render thread, because Godot's `RenderingServer` has thread affinity to the original render thread. Driving `iteration()` from a freshly spawned thread is unsafe.
 
-**Proper fix:** promote the render loop to a single, process-global thread that survives `destroy()` and is paused/resumed rather than joined. The JS `useGodotEngine` cleanup should then `pause()` on transient unmount instead of `destroy()`.
+**Current mitigation (0.1.10):** the JS layer never destroys the engine on a transient unmount. `createGodotEngine()` keeps one shared wrapper per process (`getSharedGodotEngine()`), `useGodotEngine` calls `release()` on unmount — `stopPolling()` + `suspendOS()`, native instance and render thread kept alive — and a remount adopts the shared engine in the `'suspended'` state so the next `onSurfaceCreated` takes the `resumeOS(newSurface)` path. `destroy()` remains the explicit hard teardown. This covers React remounts and Fast Refresh; a full JS reload still needs an app restart because the new JS runtime has no handle to the live engine.
+
+**Remaining proper fix:** promote the render loop to a single, process-global thread that survives `destroy()` and is paused/resumed rather than joined, and let a fresh `HybridGodotEngine` adopt the live instance so a full JS reload can reconnect.
 
 ### 8.2 `suspendOS()` / `resumeOS()` thread affinity
 
