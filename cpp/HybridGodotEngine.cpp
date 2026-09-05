@@ -431,6 +431,7 @@ void HybridGodotEngine::start() {
       dispatch_sync(dispatch_get_main_queue(), ^{
         godot_rendering_bridge_set_layer(surface);
       });
+      attached_view_.store(surface, std::memory_order_release);
       LOGI("Injected CAMetalLayer into GDTAppDelegateService stub\n");
     }
 #endif
@@ -1361,6 +1362,23 @@ void HybridGodotEngine::resumeOS(uint64_t newSurfacePointer) {
   is_surface_attached_.store(os_surface != nullptr, std::memory_order_release);
   LOGI("resumeOS() — ANativeWindow hot-swapped: 0x%llx\n",
        (unsigned long long)newSurfacePointer);
+#elif defined(__APPLE__)
+  // ── iOS: Re-parent Godot's view into a NEW React Native view ───────────
+  // A React remount (navigation, Fast Refresh, a re-keyed <GodotView>) creates
+  // a fresh GodotMetalView; the GDTView holding the rendering layer is still a
+  // subview of the old, detached one — black screen. Move it over. Same
+  // pointer (plain background → foreground) needs nothing.
+  void* attached = attached_view_.load(std::memory_order_acquire);
+  if (os_surface != nullptr && os_surface != attached) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      godot_rendering_bridge_set_layer(os_surface);
+      godot_rendering_bridge_apply_layer();
+      godot_rendering_bridge_connect_layer();
+    });
+    attached_view_.store(os_surface, std::memory_order_release);
+    LOGI("resumeOS() — rendering layer re-parented into new view 0x%llx (was 0x%llx)\n",
+         (unsigned long long)newSurfacePointer, (unsigned long long)(uintptr_t)attached);
+  }
 #endif
 
   if (!gdext_state_ || !gdext_state_->live.load(std::memory_order_acquire)) {

@@ -347,6 +347,12 @@ class HybridGodotEngine : public HybridGodotEngineSpec {
   /// use-after-free. 0 when no id is cached (or the procs are unavailable).
   GDObjectInstanceID _rnbridge_id_ = 0;
 
+  /// The native view Godot's rendering layer is currently parented into
+  /// (iOS: the GodotMetalView passed to godot_rendering_bridge_set_layer).
+  /// resumeOS() re-parents the layer when a different view arrives — the
+  /// React remount / Fast Refresh case where <GodotView> is recreated.
+  std::atomic<void*> attached_view_{nullptr};
+
   /// Pending OS surface pointer — stashed by attachSurface(), read by start().
   /// Android: ANativeWindow*   iOS: CAMetalLayer*
   std::atomic<void*> pending_surface_{nullptr};
