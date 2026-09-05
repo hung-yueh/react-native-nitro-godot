@@ -160,6 +160,15 @@ export function useGodotEngine(
     // Start polling
     engine.startPolling();
 
+    // A pckPath change re-runs this effect WITHOUT remounting the view: the
+    // cleanup below released (suspended) the engine and no new surface event
+    // will arrive, so resume on the surface we still hold. (Godot keeps
+    // running the pack it was started with — see createGodotEngine.)
+    if (engine.started && surfacePtrRef.current !== null) {
+      engine.raw.resumeOS(surfacePtrRef.current);
+      setEngineState('running');
+    }
+
     return () => {
       engine.stopPolling();
       unsubStateSync();
@@ -168,7 +177,8 @@ export function useGodotEngine(
       // (Godot cannot be restarted in-process — see ARCHITECTURE.md §8.1.)
       engine.release();
       engineRef.current = null;
-      surfacePtrRef.current = null;
+      // Keep surfacePtrRef: if this cleanup is a pckPath change rather than an
+      // unmount, the effect re-runs and resumes on this same surface.
       activeTouchesRef.current.clear();
     };
   }, [pckPath]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -31,19 +31,21 @@ jest.mock('../godotState', () => ({
 function renderHook(pckPath = '/test/game.pck') {
   const result: { current: UseGodotEngineResult } = { current: null as any };
 
-  function Harness() {
-    result.current = useGodotEngine(pckPath);
+  function Harness({ path }: { path: string }) {
+    result.current = useGodotEngine(path);
     return null;
   }
 
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
-    renderer = TestRenderer.create(<Harness />);
+    renderer = TestRenderer.create(<Harness path={pckPath} />);
   });
 
   return {
     result,
     unmount: () => act(() => renderer.unmount()),
+    /** Re-render the same mounted hook with a different pck path */
+    rerender: (path: string) => act(() => renderer.update(<Harness path={path} />)),
   };
 }
 
@@ -270,6 +272,26 @@ describe('useGodotEngine (mounted)', () => {
 
     expect(mockRaw.suspendOS).not.toHaveBeenCalled();
     expect(mockRaw.destroy).not.toHaveBeenCalled();
+  });
+
+  test('a pckPath change without remount suspends then resumes on the retained surface', () => {
+    const mockRaw = primeMockEngine();
+    const { result, rerender } = renderHook('/a.pck');
+    act(() => {
+      result.current.surfaceCallbacks.onSurfaceCreated(surfaceEvent('42'));
+    });
+    expect(result.current.engineState).toBe('running');
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+
+    // Metro re-hashed the pack asset → new extracted path → effect re-runs.
+    rerender('/b.pck');
+
+    expect(mockRaw.suspendOS).toHaveBeenCalledTimes(1);          // cleanup released it
+    expect(mockRaw.resumeOS).toHaveBeenCalledWith(BigInt(42));   // effect re-run resumed it
+    expect(mockRaw.start).toHaveBeenCalledTimes(1);              // never restarted
+    expect(mockRaw.destroy).not.toHaveBeenCalled();
+    expect(result.current.engineState).toBe('running');
+    warn.mockRestore();
   });
 
   test('remount reuses the shared engine and resumes on the new surface without start()', () => {
