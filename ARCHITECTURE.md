@@ -178,3 +178,11 @@ The engine is built for `arm64-v8a` (Android) and `ios-arm64` + `ios-arm64-simul
 ## Conclusion
 
 `react-native-nitro-godot` fundamentally tricks a massive, standalone, dictator C++ game engine into operating as a docile, headless, ultra-high-performance background microservice. It is the definitive solution for next-generation hybrid mobile applications.
+
+### Frame pacing (0.1.11)
+
+The render thread schedules frames on an absolute timeline: every frame is due `16.667 ms` after the previous one was
+*due*, and the loop `sleep_until`s that deadline (never less than an 8 ms yield so the main run loop can present).
+0.1.10 slept for the *remainder* of the budget measured from the frame's start; timer overshoot (1–3 ms on iOS) and the
+`dispatch_sync` hop then leaked into every period and pinned real devices at ~52 fps while the display presented at 120 Hz.
+If the loop falls more than a frame behind, the schedule resyncs to now instead of bursting to catch up.

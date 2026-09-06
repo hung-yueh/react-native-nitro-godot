@@ -652,11 +652,19 @@ void HybridGodotEngine::start() {
     sn_new(sn_iteration.data, "iteration", false);
 
     LOGI("Entering Godot render loop\n");
+    // Absolute frame schedule: each frame is due kFrameBudget after the previous
+    // one was due, not kFrameBudget after it started. A relative sleep_for()
+    // inherits the timer's overshoot (1–3 ms on iOS) plus the dispatch_sync hop
+    // into every period, which pinned real devices at ~52 fps.
+    using clock = std::chrono::steady_clock;
+    constexpr auto kFrameBudget = std::chrono::microseconds(16667);
+    constexpr auto kMinMainThreadYield = std::chrono::milliseconds(8);
+    auto next_frame_due = clock::now();
     while (is_running_.load(std::memory_order_acquire)) {
-      const auto frame_start = std::chrono::steady_clock::now();
       if (is_paused_.load(std::memory_order_acquire)) {
-        // While paused, sleep longer to reduce CPU usage
+        // While paused, sleep longer to reduce CPU usage, and restart the schedule on resume.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        next_frame_due = clock::now();
         continue;
       }
 
@@ -668,6 +676,7 @@ void HybridGodotEngine::start() {
       // Keep the thread alive but idle until resumeOS() reattaches a surface.
       if (!is_surface_attached_.load(std::memory_order_acquire)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        next_frame_due = clock::now();
         continue;
       }
 #endif
@@ -707,12 +716,12 @@ void HybridGodotEngine::start() {
       g_frames_produced.fetch_add(1, std::memory_order_relaxed);
 
       // Frame pacing, two goals:
-      //  1) ~60fps target: sleep the REMAINDER of the 16.6ms budget when
-      //     iteration() came in under it (the common case on real devices).
+      //  1) 60fps target: sleep until the next frame is DUE on the absolute
+      //     schedule. If iteration() ran long and we are more than a frame
+      //     behind, resync to now rather than bursting to catch up.
       //  2) ALWAYS yield the main thread a minimum slice, even when iteration()
       //     overran the budget. iteration() is dispatch_sync'd onto the main
-      //     thread; if this loop never yields (because iteration() >= budget, so
-      //     the remainder sleep is skipped), the main run loop can't cycle, so
+      //     thread; if this loop never yields, the main run loop can't cycle, so
       //     CoreAnimation's CADisplayLink never commits the rendered frame. The
       //     engine then "renders" at its iteration rate but only a fraction of
       //     those frames reach the screen. This is acute on the iOS Simulator,
@@ -720,14 +729,12 @@ void HybridGodotEngine::start() {
       //     over budget every frame — collapsing on-screen present to <10fps
       //     while the counter still reads ~40. Measured on an iPhone 17 Pro sim:
       //     an 8ms guaranteed yield lifted actual presented frames from ~9fps to
-      //     ~39fps. On real hardware iteration() is a few ms, so the budget
-      //     remainder already exceeds this floor and 60fps is unaffected.
-      using ns = std::chrono::nanoseconds;
-      constexpr auto kFrameBudget = std::chrono::microseconds(16600);
-      constexpr auto kMinMainThreadYield = std::chrono::milliseconds(8);
-      const ns remaining = std::chrono::duration_cast<ns>(
-          kFrameBudget - (std::chrono::steady_clock::now() - frame_start));
-      std::this_thread::sleep_for(std::max(remaining, ns(kMinMainThreadYield)));
+      //     ~39fps. On real hardware iteration() is a few ms, so the schedule
+      //     already leaves more than this floor and 60fps is unaffected.
+      const auto now = clock::now();
+      next_frame_due += kFrameBudget;
+      if (next_frame_due < now - kFrameBudget) next_frame_due = now;
+      std::this_thread::sleep_until(std::max(next_frame_due, now + kMinMainThreadYield));
     }
 
     if (sn_destroy) sn_destroy(sn_iteration.data);
